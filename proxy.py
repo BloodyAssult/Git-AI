@@ -155,17 +155,21 @@ def contents_to_openai_messages(contents: List[Dict[str, Any]]) -> List[Dict[str
     for c in contents:
         role = "assistant" if c.get("role") == "model" else c.get("role", "user")
         parts = c.get("parts", [])
-        content_parts = []
+        text_parts: List[Dict[str, Any]] = []
+        image_parts: List[Dict[str, Any]] = []
         for p in parts:
             if "text" in p:
-                content_parts.append({"type": "text", "text": p["text"]})
+                text_parts.append({"type": "text", "text": p["text"]})
             elif "inline_data" in p:
-                mime = p["inline_data"].get("mime_type", "image/png")
+                mime = p["inline_data"].get("mime_type", "image/jpeg")
                 data = p["inline_data"].get("data", "")
-                content_parts.append({
-                    "type": "image_url",
-                    "image_url": {"url": f"data:{mime};base64,{data}"},
-                })
+                if data:
+                    image_parts.append({
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{mime};base64,{data}", "detail": "auto"},
+                    })
+        # Put the textual instruction before images. xAI accepts any order, but some gateways are stricter.
+        content_parts = text_parts + image_parts
         if len(content_parts) == 1 and content_parts[0]["type"] == "text":
             final_content: Any = content_parts[0]["text"]
         elif content_parts:
@@ -174,6 +178,21 @@ def contents_to_openai_messages(contents: List[Dict[str, Any]]) -> List[Dict[str
             final_content = ""
         messages.append({"role": role, "content": final_content})
     return messages
+
+
+def message_stats(messages: List[Dict[str, Any]]) -> Dict[str, int]:
+    image_count = 0
+    approx_b64_chars = 0
+    for m in messages:
+        c = m.get("content")
+        if isinstance(c, list):
+            for part in c:
+                if isinstance(part, dict) and part.get("type") == "image_url":
+                    image_count += 1
+                    url = ((part.get("image_url") or {}).get("url") or "")
+                    if ";base64," in url:
+                        approx_b64_chars += len(url.split(";base64,", 1)[1])
+    return {"image_count": image_count, "approx_b64_chars": approx_b64_chars}
 
 
 def extract_text_from_openai(data: Dict[str, Any]) -> str:
@@ -391,10 +410,23 @@ def call_openai_compatible(
     if provider == "openrouter" and add_reasoning and any(x in model for x in ("deepseek-v4", "kimi-k2.6", "mimo", "qwen3.6", "glm-5.1", "minimax-m2.7", "ling-2.6")):
         payload["reasoning"] = {"effort": "high"}
 
+    stats = message_stats(messages)
+    if stats["image_count"]:
+        print(f"multimodal request: images={stats['image_count']} approx_b64_chars={stats['approx_b64_chars']}")
+
     r = requests.post(url, headers=headers, json=payload, timeout=REQUEST_TIMEOUT)
+    raw_text = r.text or ""
+    content_type = r.headers.get("Content-Type", "")
     if r.status_code != 200:
-        raise RuntimeError(f"{provider}/{model} failed: HTTP {r.status_code}: {r.text[:700]}")
-    data = r.json()
+        raise RuntimeError(f"{provider}/{model} failed: HTTP {r.status_code}: {raw_text[:900]}")
+    try:
+        data = r.json()
+    except ValueError:
+        preview = raw_text.strip()[:900] or "<empty body>"
+        extra = ""
+        if stats["image_count"]:
+            extra = f" images={stats['image_count']} approx_payload_mb={stats['approx_b64_chars']/1024/1024:.2f}. Try one smaller image or a vision-capable model if the gateway rejects it."
+        raise RuntimeError(f"{provider}/{model} returned a non-JSON response. HTTP {r.status_code}, Content-Type={content_type}.{extra} Body preview: {preview}")
 
     text = extract_text_from_openai(data)
     if not text:
