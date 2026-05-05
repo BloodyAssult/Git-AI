@@ -23,6 +23,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 XAI_API_KEY = os.environ.get("XAI_API_KEY", "")
+AVALAI_API_KEY = os.environ.get("AVALAI_API_KEY", "")
 HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_API_KEY") or os.environ.get("HUGGINGFACEHUB_API_TOKEN") or ""
 PUTER_TOKEN = os.environ.get("PUTER_TOKEN", "")
 
@@ -342,6 +343,12 @@ def call_openai_compatible(
             raise RuntimeError("HF_TOKEN secret is missing. Create a Hugging Face token with 'Make calls to Inference Providers' permission and add it to GitHub Secrets as HF_TOKEN.")
         api_key = HF_TOKEN
         url = "https://router.huggingface.co/v1/chat/completions"
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    elif provider == "avalai":
+        if not AVALAI_API_KEY:
+            raise RuntimeError("AVALAI_API_KEY secret is missing. Add your AvalAI API key to GitHub Secrets as AVALAI_API_KEY.")
+        api_key = AVALAI_API_KEY
+        url = "https://api.avalai.ir/v1/chat/completions"
         headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     elif provider == "groq":
         if not GROQ_API_KEY:

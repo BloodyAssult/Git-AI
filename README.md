@@ -4,9 +4,13 @@
 
 ## تغییرات این نسخه
 
-- همه گزینه‌ها و کدهای مربوط به NVIDIA حذف شد.
-- provider جدید `huggingface` اضافه شد و از Hugging Face Router / Inference Providers با endpoint سازگار با OpenAI استفاده می‌کند: `https://router.huggingface.co/v1/chat/completions`.
-- مدل‌های Kimi K2.6، GLM-5.1 و MiniMax M2.7 به جای NVIDIA از مسیر Hugging Face اضافه شدند.
+- ظاهر سایت به سبک **Aurora / Glassmorphism** بازطراحی شد: پس‌زمینه aurora متحرک، کارت‌های شیشه‌ای، پیام‌های مدرن‌تر، سایه و glow ملایم، و تجربه بهتر موبایل.
+- provider جدید `avalai` اضافه شد و از endpoint سازگار با OpenAI استفاده می‌کند: `https://api.avalai.ir/v1/chat/completions`.
+- بخش OpenRouter پولی حذف شد و سه مدل در AvalAI اضافه شدند:
+  - `grok-4.3`
+  - `kimi-k2.6`
+  - `glm-5.1`
+- مسیرهای NVIDIA همچنان حذف هستند.
 - `Fallback` پیش‌فرض خاموش است تا اگر یک مدل خاص را انتخاب کردی، بی‌صدا مدل دیگری جواب ندهد.
 - نام‌گذاری چت جدید هوشمند است: بعد از اولین پاسخ، یک عنوان کوتاه فارسی با مدل ارزان/رایگان ساخته می‌شود؛ اگر هیچ کلیدی موجود نباشد، fallback محلی استفاده می‌شود.
 - Gemini Direct زیر provider خودش است و OpenRouter برای مدل‌های دقیق با `provider.allow_fallbacks=false` صدا زده می‌شود.
@@ -49,12 +53,15 @@ CHAT_QUEUE_KEY=یک عبارت طولانی و تصادفی
 فقط هر کدام را که لازم داری اضافه کن:
 
 ```text
+AVALAI_API_KEY=...       # برای AvalAI: grok-4.3 / kimi-k2.6 / glm-5.1
 HF_TOKEN=...             # برای Hugging Face Router / Inference Providers
-OPENROUTER_API_KEY=...   # برای openrouter/free و مدل‌های :free یا پولی OpenRouter
+OPENROUTER_API_KEY=...   # برای openrouter/free و مدل‌های :free OpenRouter
 GEMINI_API_KEY=...       # برای Gemini Direct مثل gemini-3-flash-preview
 GROQ_API_KEY=...         # برای GPT-OSS روی Groq
-XAI_API_KEY=...          # برای xAI direct، اگر در حساب تو فعال باشد
+XAI_API_KEY=...          # پشتیبانی کدی باقی مانده، ولی در UI پیش‌فرض نمایش داده نمی‌شود
 ```
+
+برای AvalAI از داشبورد AvalAI کلید API بساز و همان را با نام `AVALAI_API_KEY` در GitHub Secrets قرار بده.
 
 برای Hugging Face یک User Access Token بساز که permission مربوط به `Make calls to Inference Providers` داشته باشد. Secret پیشنهادی در این پروژه `HF_TOKEN` است.
 
@@ -67,6 +74,12 @@ permissions:
 ```
 
 ## مدل‌های آماده در UI
+
+### AvalAI
+
+- `grok-4.3`
+- `kimi-k2.6`
+- `glm-5.1`
 
 ### Hugging Face Router / Inference Providers
 
@@ -112,18 +125,6 @@ permissions:
 
 مدل‌های GitHub Models به catalog حساب/سازمان تو وابسته‌اند؛ اگر 403/404 گرفتی یعنی آن مدل در catalog تو فعال نیست.
 
-### OpenRouter پولی / شبیه اسکرین‌شات
-
-- `moonshotai/kimi-k2.6`
-- `z-ai/glm-5.1`
-- `minimax/minimax-m2.7`
-- `xiaomi/mimo-v2-pro`
-- `xiaomi/mimo-v2-flash`
-- `qwen/qwen3.6-plus`
-- `qwen/qwen3.6-max-preview`
-- `qwen/qwen3.6-flash`
-- `deepseek/deepseek-v4-pro`
-
 ## تنظیمات داخل سایت
 
 وقتی سایت باز شد:
@@ -137,10 +138,11 @@ permissions:
 
 ## عیب‌یابی سریع
 
+- `AVALAI_API_KEY secret is missing`: مدل AvalAI انتخاب شده ولی secret نداری.
 - `HF_TOKEN secret is missing`: مدل Hugging Face انتخاب شده ولی secret نداری.
 - `OPENROUTER_API_KEY secret is missing`: مدل OpenRouter انتخاب شده ولی secret نداری.
 - پاسخ مدل دیگری آمد: دکمه Fallback را خاموش نگه دار. در این نسخه پیش‌فرض خاموش است.
 - timeout در سایت: workflow در Actions روشن نیست یا job به خطا خورده است.
 - 401 از GitHub: PAT داخل سایت اشتباه است یا Contents Read/Write ندارد.
 - 403/404 از GitHub Models: مدل در catalog حساب تو فعال نیست.
-- خطای 402/credits در Hugging Face: اعتبار ماهانه یا credit اکانتت تمام شده است.
+- خطای credit/rate limit در AvalAI یا Hugging Face: اعتبار یا محدودیت حساب/پلن تمام شده است.
