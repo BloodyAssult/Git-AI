@@ -23,7 +23,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 XAI_API_KEY = os.environ.get("XAI_API_KEY", "")
-NVIDIA_API_KEY = os.environ.get("NVIDIA_API_KEY", "")
+HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_API_KEY") or os.environ.get("HUGGINGFACEHUB_API_TOKEN") or ""
 PUTER_TOKEN = os.environ.get("PUTER_TOKEN", "")
 
 BASE = "https://api.github.com"
@@ -306,20 +306,6 @@ def _merge_meta(data: Dict[str, Any], provider: str, requested_model: str) -> Di
     return {"provider": provider, "model": data.get("model") or requested_model, "requested_model": requested_model}
 
 
-def _poll_nvidia_status(headers: Dict[str, str], request_id: str) -> Dict[str, Any]:
-    """NVIDIA NIM sometimes returns 202 for large/multimodal models; poll until 200."""
-    status_url = f"https://integrate.api.nvidia.com/v1/status/{request_id}"
-    for _ in range(90):
-        time.sleep(2)
-        pr = requests.get(status_url, headers=headers, timeout=30)
-        if pr.status_code == 202:
-            continue
-        if pr.status_code != 200:
-            raise RuntimeError(f"nvidia status polling failed: HTTP {pr.status_code}: {pr.text[:700]}")
-        return pr.json()
-    raise RuntimeError("nvidia status polling timed out.")
-
-
 def call_openai_compatible(
     provider: str,
     model: str,
@@ -351,12 +337,12 @@ def call_openai_compatible(
             "HTTP-Referer": f"https://github.com/{REPO}",
             "X-Title": "GitHub Pages AI Proxy",
         }
-    elif provider == "nvidia":
-        if not NVIDIA_API_KEY:
-            raise RuntimeError("NVIDIA_API_KEY secret is missing.")
-        api_key = NVIDIA_API_KEY
-        url = "https://integrate.api.nvidia.com/v1/chat/completions"
-        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "Accept": "application/json"}
+    elif provider == "huggingface":
+        if not HF_TOKEN:
+            raise RuntimeError("HF_TOKEN secret is missing. Create a Hugging Face token with 'Make calls to Inference Providers' permission and add it to GitHub Secrets as HF_TOKEN.")
+        api_key = HF_TOKEN
+        url = "https://router.huggingface.co/v1/chat/completions"
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     elif provider == "groq":
         if not GROQ_API_KEY:
             raise RuntimeError("GROQ_API_KEY secret is missing.")
@@ -394,21 +380,14 @@ def call_openai_compatible(
         payload["provider"] = {"allow_fallbacks": False}
 
     # Keep extra reasoning controls limited to OpenRouter, where this extension is commonly supported.
-    # Direct providers such as NVIDIA/Groq may reject unknown body fields.
-    if provider == "openrouter" and add_reasoning and any(x in model for x in ("deepseek-v4", "kimi-k2.6", "mimo", "qwen3.6", "glm-5.1", "minimax-m2.7", "nemotron", "ling-2.6")):
+    # Direct providers such as Groq/HuggingFace may reject unknown body fields.
+    if provider == "openrouter" and add_reasoning and any(x in model for x in ("deepseek-v4", "kimi-k2.6", "mimo", "qwen3.6", "glm-5.1", "minimax-m2.7", "ling-2.6")):
         payload["reasoning"] = {"effort": "high"}
 
     r = requests.post(url, headers=headers, json=payload, timeout=REQUEST_TIMEOUT)
-    if provider == "nvidia" and r.status_code == 202:
-        pending = r.json()
-        request_id = pending.get("requestId") or pending.get("request_id") or pending.get("id")
-        if not request_id:
-            raise RuntimeError(f"nvidia/{model} returned 202 without requestId: {r.text[:700]}")
-        data = _poll_nvidia_status(headers, request_id)
-    else:
-        if r.status_code != 200:
-            raise RuntimeError(f"{provider}/{model} failed: HTTP {r.status_code}: {r.text[:700]}")
-        data = r.json()
+    if r.status_code != 200:
+        raise RuntimeError(f"{provider}/{model} failed: HTTP {r.status_code}: {r.text[:700]}")
+    data = r.json()
 
     text = extract_text_from_openai(data)
     if not text:
@@ -517,8 +496,8 @@ def generate_smart_title(contents: List[Dict[str, Any]], reply: str, preferred: 
     # Prefer cheap/free title models; if no key exists they fail fast and local fallback is used.
     if OPENROUTER_API_KEY:
         candidates.append(("openrouter", "openrouter/free"))
-    if NVIDIA_API_KEY:
-        candidates.append(("nvidia", "nvidia/nemotron-3-super-120b-a12b"))
+    if HF_TOKEN:
+        candidates.append(("huggingface", "openai/gpt-oss-20b:groq"))
     if GEMINI_API_KEY:
         candidates.append(("gemini", "gemini-3-flash-preview"))
     if preferred not in candidates:
@@ -538,13 +517,13 @@ def fallback_chain(primary_provider: str, primary_model: str) -> List[Tuple[str,
     chain = [(primary_provider, primary_model)]
     # Keep the user's selected model first, then try low/no-cost fallbacks.
     candidates = [
+        ("huggingface", "openai/gpt-oss-20b:groq"),
+        ("huggingface", "Qwen/Qwen2.5-7B-Instruct:together"),
+        ("huggingface", "meta-llama/Llama-3.1-8B-Instruct:novita"),
         ("openrouter", "openrouter/free"),
         ("openrouter", "qwen/qwen3.6-plus:free"),
         ("openrouter", "xiaomi/mimo-v2-flash:free"),
         ("openrouter", "tencent/hy3-preview:free"),
-        ("openrouter", "nvidia/nemotron-3-super-120b-a12b:free"),
-        ("nvidia", "nvidia/nemotron-3-super-120b-a12b"),
-        ("nvidia", "openai/gpt-oss-120b"),
         ("groq", "openai/gpt-oss-120b"),
         ("gemini", "gemini-3-flash-preview"),
         ("github", "openai/gpt-4.1-mini"),
@@ -636,7 +615,7 @@ def process_prompt_file(path: str, sha: str) -> None:
 
 
 def main() -> None:
-    print("AI proxy started: GitHub Models + NVIDIA NIM + OpenRouter + Groq + Gemini + xAI + Puter")
+    print("AI proxy started: GitHub Models + Hugging Face Router + OpenRouter + Groq + Gemini + xAI + Puter")
     print("Queue encryption:", "ON" if CHAT_QUEUE_KEY else "OFF - add CHAT_QUEUE_KEY for public repos")
     processed = set()
     while True:

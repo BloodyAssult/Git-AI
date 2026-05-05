@@ -30,7 +30,7 @@ h1{font-size:22px;margin-top:10px}.sub{font-size:12px;color:var(--muted);line-he
     <div class="logo"><div class="mark">✦</div><h1>AI Proxy Chat</h1><p class="sub">چت از طریق GitHub Actions؛ مناسب وقتی فقط github.com باز است. درخواست‌ها در repo عمومی به‌صورت رمزنگاری‌شده ذخیره می‌شوند.</p></div>
     <div class="tabs"><button class="tab on" id="tab-main" onclick="tab('main')">تنظیم اصلی</button><button class="tab" id="tab-secret" onclick="tab('secret')">Secrets لازم</button></div>
     <div class="page on" id="page-main">
-      <div class="box"><strong>مهم:</strong> GitHub Token فقط در مرورگر خودت ذخیره می‌شود. کلید مدل‌ها مثل NVIDIA/OpenRouter/Groq/Gemini باید در GitHub Secrets باشند و هرگز از مرورگر ارسال نمی‌شوند.</div>
+      <div class="box"><strong>مهم:</strong> GitHub Token فقط در مرورگر خودت ذخیره می‌شود. کلید مدل‌ها مثل HuggingFace/OpenRouter/Groq/Gemini باید در GitHub Secrets باشند و هرگز از مرورگر ارسال نمی‌شوند.</div>
       <div class="lbl">GitHub Username</div><input class="inp" id="cfg-user" autocomplete="off" placeholder="مثلاً BloodyAssult" />
       <div class="lbl">Repository Name</div><input class="inp" id="cfg-repo" autocomplete="off" placeholder="مثلاً gemini-chat" />
       <div class="lbl">GitHub Fine-grained PAT - Contents Read/Write</div><input class="inp" id="cfg-token" type="password" autocomplete="off" placeholder="github_pat_... یا ghp_..." />
@@ -39,7 +39,7 @@ h1{font-size:22px;margin-top:10px}.sub{font-size:12px;color:var(--muted);line-he
     </div>
     <div class="page" id="page-secret">
       <div class="box green"><strong>اجباری:</strong> در Settings → Secrets and variables → Actions این Secret را بساز: <span class="code">CHAT_QUEUE_KEY</span> و مقدارش دقیقاً همان Security Key بالا باشد.</div>
-      <div class="box" style="margin-top:10px">اختیاری، بسته به providerهایی که می‌خواهی استفاده کنی:<br><span class="code">OPENROUTER_API_KEY</span> برای OpenRouter<br><span class="code">GROQ_API_KEY</span> برای Groq<br><span class="code">GEMINI_API_KEY</span> برای Gemini مستقیم<br><span class="code">NVIDIA_API_KEY</span> برای NVIDIA NIM / Free Endpoint<br><span class="code">XAI_API_KEY</span> برای Grok مستقیم</div>
+      <div class="box" style="margin-top:10px">اختیاری، بسته به providerهایی که می‌خواهی استفاده کنی:<br><span class="code">OPENROUTER_API_KEY</span> برای OpenRouter<br><span class="code">GROQ_API_KEY</span> برای Groq<br><span class="code">GEMINI_API_KEY</span> برای Gemini مستقیم<br><span class="code">HF_TOKEN</span> برای Hugging Face Router / Inference Providers<br><span class="code">XAI_API_KEY</span> برای Grok مستقیم</div>
       <div class="box warn" style="margin-top:10px">برای GitHub Models معمولاً Secret جدا لازم نیست؛ همین <span class="code">GITHUB_TOKEN</span> داخلی Action استفاده می‌شود. فقط workflow باید permission <span class="code">models: read</span> داشته باشد.</div>
     </div>
     <button class="save" onclick="saveConfig()">ذخیره و شروع</button>
@@ -55,20 +55,21 @@ h1{font-size:22px;margin-top:10px}.sub{font-size:12px;color:var(--muted);line-he
         <option value="openrouter|qwen/qwen3.6-plus:free">OpenRouter · Qwen3.6 Plus · free</option>
         <option value="openrouter|xiaomi/mimo-v2-flash:free">OpenRouter · MiMo V2 Flash · free</option>
         <option value="openrouter|tencent/hy3-preview:free">OpenRouter · Tencent Hy3 Preview · free</option>
-        <option value="openrouter|nvidia/nemotron-3-super-120b-a12b:free">OpenRouter · Nemotron 3 Super 120B · free</option>
-        <option value="openrouter|nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free">OpenRouter · Nemotron 3 Nano Omni · free vision</option>
         <option value="openrouter|inclusionai/ling-2.6-1t:free">OpenRouter · Ling 2.6 1T · free</option>
         <option value="openrouter|poolside/laguna-m.1:free">OpenRouter · Poolside Laguna M.1 · free coding</option>
         <option value="openrouter|poolside/laguna-xs.2:free">OpenRouter · Poolside Laguna XS.2 · free coding</option>
       </optgroup>
-      <optgroup label="NVIDIA NIM رایگان/Free Endpoint">
-        <option value="nvidia|moonshotai/kimi-k2.6">NVIDIA · Kimi K2.6 · Free Endpoint</option>
-        <option value="nvidia|z-ai/glm-5.1">NVIDIA · GLM-5.1 · Free Endpoint</option>
-        <option value="nvidia|minimaxai/minimax-m2.7">NVIDIA · MiniMax M2.7 · Free Endpoint</option>
-        <option value="nvidia|nvidia/nemotron-3-super-120b-a12b">NVIDIA · Nemotron 3 Super 120B</option>
-        <option value="nvidia|nvidia/nemotron-3-nano-omni-30b-a3b-reasoning">NVIDIA · Nemotron 3 Nano Omni</option>
-        <option value="nvidia|openai/gpt-oss-120b">NVIDIA · GPT-OSS 120B</option>
-        <option value="nvidia|openai/gpt-oss-20b">NVIDIA · GPT-OSS 20B</option>
+      <optgroup label="Hugging Face Router / Inference Providers">
+        <option value="huggingface|moonshotai/Kimi-K2.6:deepinfra">HF · Kimi K2.6 · DeepInfra</option>
+        <option value="huggingface|moonshotai/Kimi-K2.6:fireworks-ai">HF · Kimi K2.6 · Fireworks</option>
+        <option value="huggingface|zai-org/GLM-5.1:deepinfra">HF · GLM-5.1 · DeepInfra</option>
+        <option value="huggingface|zai-org/GLM-5.1:together">HF · GLM-5.1 · Together</option>
+        <option value="huggingface|MiniMaxAI/MiniMax-M2.7:novita">HF · MiniMax M2.7 · Novita</option>
+        <option value="huggingface|MiniMaxAI/MiniMax-M2.7:together">HF · MiniMax M2.7 · Together</option>
+        <option value="huggingface|openai/gpt-oss-120b:cerebras">HF · GPT-OSS 120B · Cerebras</option>
+        <option value="huggingface|openai/gpt-oss-20b:groq">HF · GPT-OSS 20B · Groq</option>
+        <option value="huggingface|Qwen/Qwen3.5-122B-A10B:deepinfra">HF · Qwen3.5 122B · DeepInfra</option>
+        <option value="huggingface|meta-llama/Llama-3.1-8B-Instruct:novita">HF · Llama 3.1 8B · Novita</option>
       </optgroup>
       <optgroup label="Gemini مستقیم">
         <option value="gemini|gemini-3-flash-preview">Gemini direct · Gemini 3 Flash Preview</option>
