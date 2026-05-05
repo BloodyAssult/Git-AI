@@ -2,10 +2,15 @@ name: AI Proxy
 
 on:
   workflow_dispatch:
+  # (اختیاری) اگر می‌خواهید پراکسی ۲۴ ساعته روشن بماند، این بخش را از کامنت خارج کنید
+  # schedule:
+  #   - cron: "0 */5 * * *" # اجرای خودکار هر ۵ ساعت یک‌بار برای جلوگیری از خاموش شدن بات
 
 permissions:
   contents: write
   models: read
+  issues: write         # اضافه شده: برای اینکه بات بتواند روی ایشوها کامنت بگذارد یا بخواند
+  pull-requests: write  # اضافه شده: برای کار بات با پول‌ریکوست‌ها
 
 env:
   PYTHONUNBUFFERED: "1"
@@ -21,6 +26,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # اضافه شده: نصب و تنظیم درست پایتون برای جلوگیری از خطای pip در Ubuntu-latest
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11' # می‌توانید نسخه دلخواه پایتون خود را قرار دهید
 
       - name: Install dependencies
         run: python -m pip install requests cryptography -q
