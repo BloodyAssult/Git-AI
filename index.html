@@ -30,7 +30,7 @@ h1{font-size:22px;margin-top:10px}.sub{font-size:12px;color:var(--muted);line-he
     <div class="logo"><div class="mark">✦</div><h1>AI Proxy Chat</h1><p class="sub">چت از طریق GitHub Actions؛ مناسب وقتی فقط github.com باز است. درخواست‌ها در repo عمومی به‌صورت رمزنگاری‌شده ذخیره می‌شوند.</p></div>
     <div class="tabs"><button class="tab on" id="tab-main" onclick="tab('main')">تنظیم اصلی</button><button class="tab" id="tab-secret" onclick="tab('secret')">Secrets لازم</button></div>
     <div class="page on" id="page-main">
-      <div class="box"><strong>مهم:</strong> GitHub Token فقط در مرورگر خودت ذخیره می‌شود. کلید مدل‌ها مثل OpenRouter/Groq/Puter/Gemini باید در GitHub Secrets باشند و هرگز از مرورگر ارسال نمی‌شوند.</div>
+      <div class="box"><strong>مهم:</strong> GitHub Token فقط در مرورگر خودت ذخیره می‌شود. کلید مدل‌ها مثل NVIDIA/OpenRouter/Groq/Gemini باید در GitHub Secrets باشند و هرگز از مرورگر ارسال نمی‌شوند.</div>
       <div class="lbl">GitHub Username</div><input class="inp" id="cfg-user" autocomplete="off" placeholder="مثلاً BloodyAssult" />
       <div class="lbl">Repository Name</div><input class="inp" id="cfg-repo" autocomplete="off" placeholder="مثلاً gemini-chat" />
       <div class="lbl">GitHub Fine-grained PAT - Contents Read/Write</div><input class="inp" id="cfg-token" type="password" autocomplete="off" placeholder="github_pat_... یا ghp_..." />
@@ -39,7 +39,7 @@ h1{font-size:22px;margin-top:10px}.sub{font-size:12px;color:var(--muted);line-he
     </div>
     <div class="page" id="page-secret">
       <div class="box green"><strong>اجباری:</strong> در Settings → Secrets and variables → Actions این Secret را بساز: <span class="code">CHAT_QUEUE_KEY</span> و مقدارش دقیقاً همان Security Key بالا باشد.</div>
-      <div class="box" style="margin-top:10px">اختیاری، بسته به providerهایی که می‌خواهی استفاده کنی:<br><span class="code">OPENROUTER_API_KEY</span> برای OpenRouter<br><span class="code">GROQ_API_KEY</span> برای Groq<br><span class="code">GEMINI_API_KEY</span> برای Gemini مستقیم<br><span class="code">XAI_API_KEY</span> برای Grok مستقیم<br><span class="code">PUTER_TOKEN</span> برای Puter</div>
+      <div class="box" style="margin-top:10px">اختیاری، بسته به providerهایی که می‌خواهی استفاده کنی:<br><span class="code">OPENROUTER_API_KEY</span> برای OpenRouter<br><span class="code">GROQ_API_KEY</span> برای Groq<br><span class="code">GEMINI_API_KEY</span> برای Gemini مستقیم<br><span class="code">NVIDIA_API_KEY</span> برای NVIDIA NIM / Free Endpoint<br><span class="code">XAI_API_KEY</span> برای Grok مستقیم</div>
       <div class="box warn" style="margin-top:10px">برای GitHub Models معمولاً Secret جدا لازم نیست؛ همین <span class="code">GITHUB_TOKEN</span> داخلی Action استفاده می‌شود. فقط workflow باید permission <span class="code">models: read</span> داشته باشد.</div>
     </div>
     <button class="save" onclick="saveConfig()">ذخیره و شروع</button>
@@ -50,55 +50,59 @@ h1{font-size:22px;margin-top:10px}.sub{font-size:12px;color:var(--muted);line-he
   <div class="top">
     <button class="icon" onclick="toggleSide()" title="تاریخچه">☰</button><button class="icon" onclick="newSession()" title="چت جدید">＋</button><div class="brand">AI Proxy</div>
     <select id="model">
-      <optgroup label="OpenRouter free / zero-cost first">
-        <option value="openrouter|openrouter/free">OpenRouter · Free Router · random free model</option>
-        <option value="openrouter|tencent/hy3-preview:free">OpenRouter · Tencent Hy3 preview · free</option>
+      <optgroup label="OpenRouter رایگان / محدود">
+        <option value="openrouter|openrouter/free">OpenRouter · Free Router · انتخاب خودکار مدل رایگان</option>
+        <option value="openrouter|qwen/qwen3.6-plus:free">OpenRouter · Qwen3.6 Plus · free</option>
+        <option value="openrouter|xiaomi/mimo-v2-flash:free">OpenRouter · MiMo V2 Flash · free</option>
+        <option value="openrouter|tencent/hy3-preview:free">OpenRouter · Tencent Hy3 Preview · free</option>
         <option value="openrouter|nvidia/nemotron-3-super-120b-a12b:free">OpenRouter · Nemotron 3 Super 120B · free</option>
         <option value="openrouter|nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free">OpenRouter · Nemotron 3 Nano Omni · free vision</option>
         <option value="openrouter|inclusionai/ling-2.6-1t:free">OpenRouter · Ling 2.6 1T · free</option>
         <option value="openrouter|poolside/laguna-m.1:free">OpenRouter · Poolside Laguna M.1 · free coding</option>
         <option value="openrouter|poolside/laguna-xs.2:free">OpenRouter · Poolside Laguna XS.2 · free coding</option>
-        <option value="openrouter|qwen/qwen3.6-plus-preview:free">OpenRouter · Qwen3.6 Plus Preview · free</option>
       </optgroup>
-      <optgroup label="GitHub Models - free limited if enabled in your account">
-        <option value="github|openai/gpt-5.4-mini">GitHub Models · GPT-5.4 mini · if in catalog</option>
-        <option value="github|deepseek/deepseek-v4-flash">GitHub Models · DeepSeek V4 Flash · if in catalog</option>
+      <optgroup label="NVIDIA NIM رایگان/Free Endpoint">
+        <option value="nvidia|moonshotai/kimi-k2.6">NVIDIA · Kimi K2.6 · Free Endpoint</option>
+        <option value="nvidia|z-ai/glm-5.1">NVIDIA · GLM-5.1 · Free Endpoint</option>
+        <option value="nvidia|minimaxai/minimax-m2.7">NVIDIA · MiniMax M2.7 · Free Endpoint</option>
+        <option value="nvidia|nvidia/nemotron-3-super-120b-a12b">NVIDIA · Nemotron 3 Super 120B</option>
+        <option value="nvidia|nvidia/nemotron-3-nano-omni-30b-a3b-reasoning">NVIDIA · Nemotron 3 Nano Omni</option>
+        <option value="nvidia|openai/gpt-oss-120b">NVIDIA · GPT-OSS 120B</option>
+        <option value="nvidia|openai/gpt-oss-20b">NVIDIA · GPT-OSS 20B</option>
       </optgroup>
-      <optgroup label="Groq / Gemini direct free tiers">
-        <option value="groq|openai/gpt-oss-120b">Groq · GPT-OSS 120B · free tier</option>
-        <option value="gemini|gemini-3-flash-preview">Gemini direct · 3 Flash Preview</option>
+      <optgroup label="Gemini مستقیم">
+        <option value="gemini|gemini-3-flash-preview">Gemini direct · Gemini 3 Flash Preview</option>
+        <option value="gemini|gemini-3.1-pro-preview">Gemini direct · Gemini 3.1 Pro Preview</option>
+        <option value="gemini|gemini-3.1-flash-lite-preview">Gemini direct · Gemini 3.1 Flash-Lite Preview</option>
+        <option value="gemini|gemini-2.5-flash">Gemini direct · Gemini 2.5 Flash</option>
+        <option value="gemini|gemini-2.5-flash-lite">Gemini direct · Gemini 2.5 Flash-Lite</option>
       </optgroup>
-      <optgroup label="OpenRouter screenshot-like models - paid unless your account has credits/free route">
-        <option value="openrouter|openai/gpt-5.5">OpenRouter · GPT-5.5</option>
-        <option value="openrouter|openai/gpt-5.5-pro">OpenRouter · GPT-5.5 Pro</option>
-        <option value="openrouter|openai/gpt-5.4-mini">OpenRouter · GPT-5.4 Mini</option>
-        <option value="openrouter|anthropic/claude-sonnet-4.6">OpenRouter · Claude Sonnet 4.6</option>
-        <option value="openrouter|google/gemini-3.1-pro-preview">OpenRouter · Gemini 3.1 Pro Preview</option>
+      <optgroup label="Groq رایگان/محدود">
+        <option value="groq|openai/gpt-oss-120b">Groq · GPT-OSS 120B</option>
+        <option value="groq|openai/gpt-oss-20b">Groq · GPT-OSS 20B</option>
+      </optgroup>
+      <optgroup label="GitHub Models؛ فقط مدل‌های catalog حساب تو">
+        <option value="github|openai/gpt-4.1-mini">GitHub Models · OpenAI GPT-4.1 mini</option>
+        <option value="github|openai/gpt-4.1">GitHub Models · OpenAI GPT-4.1</option>
+        <option value="github|openai/gpt-4o-mini">GitHub Models · OpenAI GPT-4o mini</option>
+      </optgroup>
+      <optgroup label="OpenRouter پولی / شبیه اسکرین‌شات">
         <option value="openrouter|moonshotai/kimi-k2.6">OpenRouter · Kimi K2.6</option>
-        <option value="openrouter|xiaomi/mimo-v2.5-pro">OpenRouter · MiMo V2.5 Pro</option>
-        <option value="openrouter|x-ai/grok-4.3">OpenRouter · Grok 4.3</option>
-        <option value="openrouter|qwen/qwen3.6-max-preview">OpenRouter · Qwen3.6 Max Preview</option>
-        <option value="openrouter|deepseek/deepseek-v4-pro">OpenRouter · DeepSeek V4 Pro</option>
         <option value="openrouter|z-ai/glm-5.1">OpenRouter · GLM-5.1</option>
         <option value="openrouter|minimax/minimax-m2.7">OpenRouter · MiniMax M2.7</option>
+        <option value="openrouter|xiaomi/mimo-v2-pro">OpenRouter · MiMo V2 Pro</option>
+        <option value="openrouter|xiaomi/mimo-v2-flash">OpenRouter · MiMo V2 Flash</option>
+        <option value="openrouter|qwen/qwen3.6-plus">OpenRouter · Qwen3.6 Plus</option>
+        <option value="openrouter|qwen/qwen3.6-max-preview">OpenRouter · Qwen3.6 Max Preview</option>
+        <option value="openrouter|qwen/qwen3.6-flash">OpenRouter · Qwen3.6 Flash</option>
+        <option value="openrouter|deepseek/deepseek-v4-pro">OpenRouter · DeepSeek V4 Pro</option>
       </optgroup>
-      <optgroup label="Puter user-pays / user-limited">
-        <option value="puter|openai/gpt-5.5">Puter · GPT-5.5</option>
-        <option value="puter|openai/gpt-5.5-pro">Puter · GPT-5.5 Pro</option>
-        <option value="puter|anthropic/claude-opus-4.7">Puter · Claude Opus 4.7</option>
-        <option value="puter|google/gemini-3.1-pro-preview">Puter · Gemini 3.1 Pro</option>
-        <option value="puter|moonshotai/kimi-k2.6">Puter · Kimi K2.6</option>
-        <option value="puter|x-ai/grok-4.3">Puter · Grok 4.3</option>
-        <option value="puter|xiaomi/mimo-v2.5-pro">Puter · MiMo V2.5 Pro</option>
-        <option value="puter|deepseek/deepseek-v4-pro">Puter · DeepSeek V4 Pro</option>
-      </optgroup>
-      <optgroup label="Direct provider">
-        <option value="xai|grok-4.3">xAI direct · Grok 4.3</option>
-        <option value="gemini|gemini-3.1-pro-preview">Gemini direct · Gemini 3.1 Pro</option>
+      <optgroup label="xAI مستقیم؛ اگر API key داری">
+        <option value="xai|grok-4">xAI direct · Grok 4</option>
       </optgroup>
     </select>
     <button class="toggle" id="searchBtn" onclick="toggleSearch()">🔍 سرچ</button>
-    <button class="toggle on" id="fallbackBtn" onclick="toggleFallback()">Fallback</button>
+    <button class="toggle" id="fallbackBtn" onclick="toggleFallback()">Fallback خاموش</button>
     <div class="spacer"></div>
     <button class="icon" onclick="showSetup()">⚙️</button>
   </div>
@@ -112,7 +116,7 @@ h1{font-size:22px;margin-top:10px}.sub{font-size:12px;color:var(--muted);line-he
 
 <script>
 const CK='aip_cfg_v1', SK='aip_sessions_v1', AK='aip_active_v1';
-let cfg={}, sessions={}, active=null, loading=false, cancelled=false, doSearch=false, useFallback=true, pendImgs=[];
+let cfg={}, sessions={}, active=null, loading=false, cancelled=false, doSearch=false, useFallback=false, pendImgs=[];
 const GH='https://api.github.com';
 
 function $(id){return document.getElementById(id)}
@@ -181,7 +185,7 @@ async function ghDel(path,sha){
 // ── sessions ──
 function saveSessions(){localStorage.setItem(SK,JSON.stringify(sessions))}
 function closeSide(){if(window.matchMedia('(max-width:760px)').matches)$('side').classList.remove('open')}
-function makeTitle(text,hasImg){const t=String(text||'').replace(/\s+/g,' ').trim(); if(!t)return hasImg?'چت تصویری':'چت جدید'; return t.length>42?t.slice(0,42)+'…':t}
+function makeTitle(text,hasImg){const t=String(text||'').replace(/\s+/g,' ').trim(); if(!t)return hasImg?'چت تصویری':'چت جدید'; return t.length>52?t.slice(0,52)+'…':t}
 function newSession(){const id='s'+uid();const now=Date.now();sessions[id]={id,title:'چت جدید',created:now,updated:now,history:[]};saveSessions();loadSession(id);closeSide()}
 function loadSession(id){active=id;localStorage.setItem(AK,id);renderMessages();renderSessions();closeSide()}
 function deleteSession(id,e){e.stopPropagation();if(Object.keys(sessions).length<=1)return alert('آخرین چت را نمی‌شود پاک کرد');delete sessions[id];saveSessions();if(active===id)loadSession(Object.keys(sessions)[0]);renderSessions()}
@@ -191,7 +195,7 @@ function addMsg(role,text,imgs=[],meta=null,save=true){
   const el=$('msgs');const empty=el.querySelector('.empty');if(empty)empty.remove();
   const div=document.createElement('div');div.className='msg '+(role==='user'?'user':'model');
   const imgHtml=imgs&&imgs.length?`<div class="imgs">${imgs.map(src=>`<img src="${src}">`).join('')}</div>`:'';
-  const metaHtml=meta?`<div class="meta">${esc(meta.provider||'')}/${esc(meta.model||'')}</div>`:'';
+  const metaHtml=meta?`<div class="meta">${esc(meta.provider||'')}/${esc(meta.model||'')}${meta.requested_model&&meta.requested_model!==meta.model?' · requested: '+esc(meta.requested_model):''}</div>`:'';
   div.innerHTML=`<div class="av">${role==='user'?'تو':'AI'}</div><div class="bubble">${imgHtml}${esc(text||'')}${metaHtml}</div>`;
   el.appendChild(div);el.scrollTop=el.scrollHeight;
 }
@@ -202,7 +206,7 @@ function renderPreview(){$('preview').innerHTML=pendImgs.map(i=>`<div class="pw"
 function removeImg(id){pendImgs=pendImgs.filter(x=>x.id!==id);renderPreview()}
 
 function toggleSearch(){doSearch=!doSearch;$('searchBtn').classList.toggle('on',doSearch)}
-function toggleFallback(){useFallback=!useFallback;$('fallbackBtn').classList.toggle('on',useFallback)}
+function toggleFallback(){useFallback=!useFallback;$('fallbackBtn').classList.toggle('on',useFallback);$('fallbackBtn').textContent=useFallback?'Fallback روشن':'Fallback خاموش'}
 function toggleSide(){const side=$('side'); if(window.matchMedia('(max-width:760px)').matches)side.classList.toggle('open'); else side.classList.toggle('hide')}
 function autoResize(t){t.style.height='auto';t.style.height=Math.min(t.scrollHeight,160)+'px'}
 function onKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg()}}
@@ -215,18 +219,18 @@ async function sendMsg(){
   if(!cfg.user||!cfg.repo||!cfg.token)return showSetup();
   ta.value='';ta.style.height='auto';pendImgs=[];renderPreview();cancelled=false;setLoading(true);setStatus('در حال ارسال به GitHub...');
   const sess=sessions[active]; const isFirst=!sess.history.length;
-  addMsg('user',text,imgs.map(i=>i.prev),null,true); sess.history.push({role:'user',text,imgs:imgs.map(i=>i.prev)}); sess.updated=Date.now(); if(isFirst){sess.title=makeTitle(text,imgs.length);renderSessions()} saveSessions();
+  addMsg('user',text,imgs.map(i=>i.prev),null,true); sess.history.push({role:'user',text,imgs:imgs.map(i=>i.prev)}); sess.updated=Date.now(); if(isFirst){sess.title='در حال نام‌گذاری…';renderSessions()} saveSessions();
   try{
     const parts=[]; imgs.forEach(i=>parts.push({inline_data:{mime_type:i.mime,data:i.b64}})); if(text)parts.push({text});
     const history=sess.history.map((m,i)=>{if(m.role==='user'&&i===sess.history.length-1)return {role:'user',parts};return {role:m.role==='model'?'model':'user',parts:[{text:m.text||''}]}});
     const [provider,model]=$('model').value.split('|'); const id=uid();
-    const payload={id,provider,model,use_search:doSearch,use_fallback:useFallback,contents:history};
+    const payload={id,provider,model,use_search:doSearch,use_fallback:useFallback,make_title:isFirst,contents:history};
     const envelope=await encryptObj(payload);
     await ghPut(`queue/prompt_${id}.json`,envelope,null);
     setStatus('منتظر پاسخ Actions...');
     const out=await pollResponse(id); if(cancelled)return;
     const cand=out?.candidates?.[0]; const reply=cand?.content?.parts?.[0]?.text; if(out?.error)throw new Error(out.error.message||JSON.stringify(out.error)); if(!reply)throw new Error('پاسخ خالی بود');
-    addMsg('model',reply,[],out.meta||null,true); sess.history.push({role:'model',text:reply,meta:out.meta||null}); sess.updated=Date.now(); saveSessions(); renderSessions(); setStatus('آماده');
+    addMsg('model',reply,[],out.meta||null,true); sess.history.push({role:'model',text:reply,meta:out.meta||null}); if(isFirst){const smartTitle=out?.meta?.title||''; sess.title=smartTitle?makeTitle(smartTitle,false):makeTitle(text,imgs.length)} sess.updated=Date.now(); saveSessions(); renderSessions(); setStatus('آماده');
   }catch(e){if(!cancelled){addMsg('model','❌ '+e.message,[],null,true);setStatus('خطا')}}
   finally{if(!cancelled)setLoading(false);ta.focus()}
 }

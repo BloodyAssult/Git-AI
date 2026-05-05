@@ -23,6 +23,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 XAI_API_KEY = os.environ.get("XAI_API_KEY", "")
+NVIDIA_API_KEY = os.environ.get("NVIDIA_API_KEY", "")
 PUTER_TOKEN = os.environ.get("PUTER_TOKEN", "")
 
 BASE = "https://api.github.com"
@@ -301,13 +302,44 @@ def inject_search(contents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 # ─────────────────────────────────────────────────────────────────────────────
 # Provider calls
 # ─────────────────────────────────────────────────────────────────────────────
-def call_openai_compatible(provider: str, model: str, contents: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _merge_meta(data: Dict[str, Any], provider: str, requested_model: str) -> Dict[str, Any]:
+    return {"provider": provider, "model": data.get("model") or requested_model, "requested_model": requested_model}
+
+
+def _poll_nvidia_status(headers: Dict[str, str], request_id: str) -> Dict[str, Any]:
+    """NVIDIA NIM sometimes returns 202 for large/multimodal models; poll until 200."""
+    status_url = f"https://integrate.api.nvidia.com/v1/status/{request_id}"
+    for _ in range(90):
+        time.sleep(2)
+        pr = requests.get(status_url, headers=headers, timeout=30)
+        if pr.status_code == 202:
+            continue
+        if pr.status_code != 200:
+            raise RuntimeError(f"nvidia status polling failed: HTTP {pr.status_code}: {pr.text[:700]}")
+        return pr.json()
+    raise RuntimeError("nvidia status polling timed out.")
+
+
+def call_openai_compatible(
+    provider: str,
+    model: str,
+    contents: List[Dict[str, Any]],
+    *,
+    max_tokens: Optional[int] = None,
+    temperature: Optional[float] = None,
+    add_reasoning: bool = True,
+) -> Dict[str, Any]:
     messages = contents_to_openai_messages(contents)
 
     if provider == "github":
         api_key = GH_TOKEN
         url = "https://models.github.ai/inference/chat/completions"
-        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "Accept": "application/vnd.github+json"}
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2026-03-10",
+        }
     elif provider == "openrouter":
         if not OPENROUTER_API_KEY:
             raise RuntimeError("OPENROUTER_API_KEY secret is missing.")
@@ -319,6 +351,12 @@ def call_openai_compatible(provider: str, model: str, contents: List[Dict[str, A
             "HTTP-Referer": f"https://github.com/{REPO}",
             "X-Title": "GitHub Pages AI Proxy",
         }
+    elif provider == "nvidia":
+        if not NVIDIA_API_KEY:
+            raise RuntimeError("NVIDIA_API_KEY secret is missing.")
+        api_key = NVIDIA_API_KEY
+        url = "https://integrate.api.nvidia.com/v1/chat/completions"
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "Accept": "application/json"}
     elif provider == "groq":
         if not GROQ_API_KEY:
             raise RuntimeError("GROQ_API_KEY secret is missing.")
@@ -345,55 +383,171 @@ def call_openai_compatible(provider: str, model: str, contents: List[Dict[str, A
         "messages": messages,
         "stream": False,
     }
+    if max_tokens:
+        payload["max_tokens"] = max_tokens
+    if temperature is not None:
+        payload["temperature"] = temperature
 
-    # Some providers understand reasoning; unsupported providers usually ignore it or return a clear error.
-    if any(x in model for x in ("gpt-5", "claude", "gemini-3", "grok-4", "deepseek-v4", "kimi-k2.6", "mimo", "qwen3.6", "glm-5.1", "minimax-m2.7", "nemotron", "ling-2.6")):
+    # Disable OpenRouter provider fallback for exact models so a wrong model does not answer silently.
+    # Keep it enabled only for the special OpenRouter free router, because that model is a router by design.
+    if provider == "openrouter" and model != "openrouter/free":
+        payload["provider"] = {"allow_fallbacks": False}
+
+    # Keep extra reasoning controls limited to OpenRouter, where this extension is commonly supported.
+    # Direct providers such as NVIDIA/Groq may reject unknown body fields.
+    if provider == "openrouter" and add_reasoning and any(x in model for x in ("deepseek-v4", "kimi-k2.6", "mimo", "qwen3.6", "glm-5.1", "minimax-m2.7", "nemotron", "ling-2.6")):
         payload["reasoning"] = {"effort": "high"}
 
     r = requests.post(url, headers=headers, json=payload, timeout=REQUEST_TIMEOUT)
-    if r.status_code != 200:
-        raise RuntimeError(f"{provider}/{model} failed: HTTP {r.status_code}: {r.text[:700]}")
-    data = r.json()
+    if provider == "nvidia" and r.status_code == 202:
+        pending = r.json()
+        request_id = pending.get("requestId") or pending.get("request_id") or pending.get("id")
+        if not request_id:
+            raise RuntimeError(f"nvidia/{model} returned 202 without requestId: {r.text[:700]}")
+        data = _poll_nvidia_status(headers, request_id)
+    else:
+        if r.status_code != 200:
+            raise RuntimeError(f"{provider}/{model} failed: HTTP {r.status_code}: {r.text[:700]}")
+        data = r.json()
+
     text = extract_text_from_openai(data)
     if not text:
         raise RuntimeError(f"{provider}/{model} returned an empty response: {json.dumps(data)[:500]}")
-    return as_gemini_response(text, {"provider": provider, "model": data.get("model") or model, "requested_model": model})
+    return as_gemini_response(text, _merge_meta(data, provider, model))
 
 
-def call_gemini(model: str, contents: List[Dict[str, Any]]) -> Dict[str, Any]:
+def call_gemini(
+    model: str,
+    contents: List[Dict[str, Any]],
+    *,
+    max_tokens: Optional[int] = None,
+    temperature: Optional[float] = None,
+) -> Dict[str, Any]:
     if not GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY secret is missing.")
+    gen_cfg: Dict[str, Any] = {}
+    if max_tokens:
+        gen_cfg["maxOutputTokens"] = max_tokens
+    if temperature is not None:
+        gen_cfg["temperature"] = temperature
+    body: Dict[str, Any] = {"contents": contents}
+    if gen_cfg:
+        body["generationConfig"] = gen_cfg
     r = requests.post(
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}",
-        json={"contents": contents},
+        json=body,
         timeout=REQUEST_TIMEOUT,
     )
     if r.status_code != 200:
         raise RuntimeError(f"gemini/{model} failed: HTTP {r.status_code}: {r.text[:700]}")
     data = r.json()
-    data["meta"] = {"provider": "gemini", "model": model}
+    data["meta"] = {"provider": "gemini", "model": model, "requested_model": model}
     return data
 
 
-def call_provider(provider: str, model: str, contents: List[Dict[str, Any]]) -> Dict[str, Any]:
+def call_provider(
+    provider: str,
+    model: str,
+    contents: List[Dict[str, Any]],
+    *,
+    max_tokens: Optional[int] = None,
+    temperature: Optional[float] = None,
+    add_reasoning: bool = True,
+) -> Dict[str, Any]:
     if provider == "gemini":
-        return call_gemini(model, contents)
-    return call_openai_compatible(provider, model, contents)
+        return call_gemini(model, contents, max_tokens=max_tokens, temperature=temperature)
+    return call_openai_compatible(provider, model, contents, max_tokens=max_tokens, temperature=temperature, add_reasoning=add_reasoning)
+
+
+def _first_user_text(contents: List[Dict[str, Any]]) -> Tuple[str, bool]:
+    text = ""
+    has_img = False
+    for c in contents:
+        if c.get("role") != "user":
+            continue
+        for p in c.get("parts", []):
+            if "text" in p and not text:
+                text = p.get("text", "")
+            if "inline_data" in p:
+                has_img = True
+    return text.strip(), has_img
+
+
+def local_title(text: str, has_img: bool = False) -> str:
+    t = re.sub(r"\s+", " ", text or "").strip()
+    t = re.sub(r"^(سلام|درود|هی|hello|hi)\s*[,،!]*\s*", "", t, flags=re.I)
+    if not t:
+        return "تحلیل تصویر" if has_img else "چت جدید"
+    # Remove common filler and keep a compact topic-like title.
+    t = re.sub(r"\b(لطفا|لطفاً|میخوام|می‌خوام|میشه|میتونی|می‌تونی|برام|برای من)\b", "", t)
+    t = re.sub(r"\s+", " ", t).strip(" -،,.؟?")
+    words = t.split()
+    return " ".join(words[:7])[:58] or ("تحلیل تصویر" if has_img else "چت جدید")
+
+
+def clean_title(title: str) -> str:
+    title = re.sub(r"[\n\r\t]+", " ", title or "")
+    title = title.strip().strip("\"“”'`*-:،. ")
+    title = re.sub(r"^(عنوان|Title)\s*[:：-]\s*", "", title, flags=re.I).strip()
+    title = re.sub(r"\s+", " ", title)
+    if len(title) > 58:
+        title = title[:58].rstrip() + "…"
+    return title
+
+
+def _extract_text_from_gemini_like(res: Dict[str, Any]) -> str:
+    try:
+        return res.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+    except Exception:
+        return ""
+
+
+def generate_smart_title(contents: List[Dict[str, Any]], reply: str, preferred: Tuple[str, str]) -> Dict[str, str]:
+    user_text, has_img = _first_user_text(contents)
+    fallback = local_title(user_text, has_img)
+    prompt = (
+        "برای این گفت‌وگو یک عنوان کوتاه و طبیعی فارسی بساز. "
+        "فقط خود عنوان را بده؛ بدون نقل‌قول، بدون نقطه، بدون توضیح. "
+        "۲ تا ۶ کلمه، شبیه عنوان چت در ChatGPT.\n\n"
+        f"پیام کاربر:\n{user_text[:1400]}\n\n"
+        f"خلاصه پاسخ مدل:\n{reply[:1200]}"
+    )
+    title_contents = [{"role": "user", "parts": [{"text": prompt}]}]
+    candidates: List[Tuple[str, str]] = []
+    # Prefer cheap/free title models; if no key exists they fail fast and local fallback is used.
+    if OPENROUTER_API_KEY:
+        candidates.append(("openrouter", "openrouter/free"))
+    if NVIDIA_API_KEY:
+        candidates.append(("nvidia", "nvidia/nemotron-3-super-120b-a12b"))
+    if GEMINI_API_KEY:
+        candidates.append(("gemini", "gemini-3-flash-preview"))
+    if preferred not in candidates:
+        candidates.append(preferred)
+    for prov, mod in candidates:
+        try:
+            res = call_provider(prov, mod, title_contents, max_tokens=48, temperature=0.2, add_reasoning=False)
+            title = clean_title(_extract_text_from_gemini_like(res))
+            if 2 <= len(title) <= 60:
+                return {"title": title, "title_provider": prov, "title_model": mod}
+        except Exception as e:
+            print(f"smart title failed on {prov}/{mod}: {str(e)[:240]}")
+    return {"title": fallback, "title_provider": "local", "title_model": "heuristic"}
 
 
 def fallback_chain(primary_provider: str, primary_model: str) -> List[Tuple[str, str]]:
     chain = [(primary_provider, primary_model)]
-    # Keep the user's selected model first, then try genuinely low/no-cost fallbacks.
+    # Keep the user's selected model first, then try low/no-cost fallbacks.
     candidates = [
         ("openrouter", "openrouter/free"),
+        ("openrouter", "qwen/qwen3.6-plus:free"),
+        ("openrouter", "xiaomi/mimo-v2-flash:free"),
         ("openrouter", "tencent/hy3-preview:free"),
         ("openrouter", "nvidia/nemotron-3-super-120b-a12b:free"),
-        ("openrouter", "inclusionai/ling-2.6-1t:free"),
-        ("github", "openai/gpt-5.4-mini"),
-        ("github", "deepseek/deepseek-v4-flash"),
+        ("nvidia", "nvidia/nemotron-3-super-120b-a12b"),
+        ("nvidia", "openai/gpt-oss-120b"),
         ("groq", "openai/gpt-oss-120b"),
         ("gemini", "gemini-3-flash-preview"),
-        ("puter", "openai/gpt-5.5"),
+        ("github", "openai/gpt-4.1-mini"),
     ]
     for item in candidates:
         if item not in chain:
@@ -403,9 +557,10 @@ def fallback_chain(primary_provider: str, primary_model: str) -> List[Tuple[str,
 
 def run_request(data: Dict[str, Any]) -> Dict[str, Any]:
     provider = data.get("provider", "github")
-    model = data.get("model", "openai/gpt-5.4-mini")
+    model = data.get("model", "openai/gpt-4.1-mini")
     use_search = bool(data.get("use_search", False))
-    use_fallback = bool(data.get("use_fallback", True))
+    use_fallback = bool(data.get("use_fallback", False))
+    make_title = bool(data.get("make_title", False))
     contents = data.get("contents", [])
 
     if use_search:
@@ -421,15 +576,21 @@ def run_request(data: Dict[str, Any]) -> Dict[str, Any]:
                 note = "\n\n---\n«یادداشت سیستم: مدل انتخابی اول خطا داد و پاسخ با fallback ساخته شد.»"
                 try:
                     res["candidates"][0]["content"]["parts"][0]["text"] += note
-                    res["meta"]["fallback_errors"] = errors[-3:]
+                    res.setdefault("meta", {})["fallback_errors"] = errors[-3:]
                 except Exception:
                     pass
+            if make_title:
+                try:
+                    reply = res["candidates"][0]["content"]["parts"][0].get("text", "")
+                    title_meta = generate_smart_title(contents, reply, (provider, model))
+                    res.setdefault("meta", {}).update(title_meta)
+                except Exception as e:
+                    print(f"title generation wrapper failed: {str(e)[:240]}")
             return res
         except Exception as e:
             msg = str(e)
             print(f"attempt failed: {msg[:600]}")
             errors.append({"provider": prov, "model": mod, "error": msg[:900]})
-            # Only fallback on missing keys, rate limits, unavailable model, server errors.
             continue
     return {"error": {"code": 500, "message": "All providers failed.", "details": errors}}
 
@@ -475,7 +636,7 @@ def process_prompt_file(path: str, sha: str) -> None:
 
 
 def main() -> None:
-    print("AI proxy started: GitHub Models + Puter + OpenRouter + Groq + Gemini + xAI")
+    print("AI proxy started: GitHub Models + NVIDIA NIM + OpenRouter + Groq + Gemini + xAI + Puter")
     print("Queue encryption:", "ON" if CHAT_QUEUE_KEY else "OFF - add CHAT_QUEUE_KEY for public repos")
     processed = set()
     while True:
