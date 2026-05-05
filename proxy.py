@@ -347,7 +347,7 @@ def call_openai_compatible(provider: str, model: str, contents: List[Dict[str, A
     }
 
     # Some providers understand reasoning; unsupported providers usually ignore it or return a clear error.
-    if any(x in model for x in ("gpt-5", "claude-opus", "gemini-3", "grok-4", "deepseek-v4", "kimi-k2.6", "mimo")):
+    if any(x in model for x in ("gpt-5", "claude", "gemini-3", "grok-4", "deepseek-v4", "kimi-k2.6", "mimo", "qwen3.6", "glm-5.1", "minimax-m2.7", "nemotron", "ling-2.6")):
         payload["reasoning"] = {"effort": "high"}
 
     r = requests.post(url, headers=headers, json=payload, timeout=REQUEST_TIMEOUT)
@@ -357,7 +357,7 @@ def call_openai_compatible(provider: str, model: str, contents: List[Dict[str, A
     text = extract_text_from_openai(data)
     if not text:
         raise RuntimeError(f"{provider}/{model} returned an empty response: {json.dumps(data)[:500]}")
-    return as_gemini_response(text, {"provider": provider, "model": model})
+    return as_gemini_response(text, {"provider": provider, "model": data.get("model") or model, "requested_model": model})
 
 
 def call_gemini(model: str, contents: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -385,9 +385,12 @@ def fallback_chain(primary_provider: str, primary_model: str) -> List[Tuple[str,
     chain = [(primary_provider, primary_model)]
     # Keep the user's selected model first, then try genuinely low/no-cost fallbacks.
     candidates = [
+        ("openrouter", "openrouter/free"),
+        ("openrouter", "tencent/hy3-preview:free"),
+        ("openrouter", "nvidia/nemotron-3-super-120b-a12b:free"),
+        ("openrouter", "inclusionai/ling-2.6-1t:free"),
         ("github", "openai/gpt-5.4-mini"),
         ("github", "deepseek/deepseek-v4-flash"),
-        ("openrouter", "openrouter/free"),
         ("groq", "openai/gpt-oss-120b"),
         ("gemini", "gemini-3-flash-preview"),
         ("puter", "openai/gpt-5.5"),
