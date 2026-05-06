@@ -9,7 +9,6 @@ The GitHub Pages UI writes browser requests to browser_queue/prompt_<id>.json.
 This worker polls that queue, runs Chromium/Playwright inside the Codespace, and
 writes browser_queue/response_<id>.json for the UI to read.
 """
-import hashlib
 import json
 import os
 import re
@@ -25,6 +24,9 @@ BASE = "https://api.github.com"
 QUEUE_DIR = os.environ.get("WORKER_QUEUE_DIR", "browser_queue").strip("/") or "browser_queue"
 POLL_SECONDS = float(os.environ.get("WORKER_POLL_SECONDS", "1.2"))
 HEARTBEAT_SECONDS = float(os.environ.get("WORKER_HEARTBEAT_SECONDS", "8"))
+WORKER_PROTOCOL_VERSION = "2026-05-06-lowdata-v2"
+WORKER_STARTED_AT = time.time()
+PROCESSED_COUNT = 0
 
 
 def _run(cmd: List[str]) -> str:
@@ -100,20 +102,43 @@ def id_from_prompt_path(path: str) -> str:
 
 
 def write_response(req_id: str, result: Any) -> None:
+    """Write the response, with progressively smaller fallbacks.
+
+    A big browser payload can fail to commit via Contents API. Previously that made
+    the web UI wait forever. Now every failed write degrades to a smaller payload
+    and finally to a tiny explicit error response.
+    """
     resp_path = f"{QUEUE_DIR}/response_{req_id}.json"
-    old_sha = proxy.get_file_sha(resp_path)
-    payload = proxy.encrypt_envelope(result)
-    ok = proxy.put_file(resp_path, payload, old_sha)
-    if not ok and isinstance(result, dict) and isinstance(result.get("browser"), dict):
-        # Same safety fallback as Actions: preserve the stable screenshot and remove extra frames.
+
+    def attempt(obj: Any) -> bool:
+        old_sha = proxy.get_file_sha(resp_path)
+        return proxy.put_file(resp_path, proxy.encrypt_envelope(obj), old_sha)
+
+    if attempt(result):
+        return
+
+    if isinstance(result, dict) and isinstance(result.get("browser"), dict):
         lean = dict(result)
         b = dict(result["browser"])
         b["frames"] = []
         b["note"] = (b.get("note") or "") + "\nفریم‌های ویدیو برای کاهش حجم حذف شدند."
         lean["browser"] = b
-        proxy.put_file(resp_path, proxy.encrypt_envelope(lean), old_sha)
+        if attempt(lean):
+            write_worker_status({"state": "idle", "message": "response written without frames", "last_request_id": req_id})
+            return
 
+        tiny = dict(lean)
+        tb = dict(b)
+        tb["screenshot"] = ""
+        tb["text_preview"] = (tb.get("text_preview") or "")[:1200]
+        tb["note"] = (tb.get("note") or "") + "\nاسکرین‌شات هم برای کاهش حجم حذف شد؛ دوباره Refresh Frame را بزن."
+        tiny["browser"] = tb
+        if attempt(tiny):
+            write_worker_status({"state": "idle", "message": "response written as tiny payload", "last_request_id": req_id})
+            return
 
+    attempt({"error": {"code": 500, "message": "Worker پاسخ را ساخت ولی نتوانست آن را در GitHub ذخیره کند. حجم خروجی یا دسترسی repo را چک کن."}})
+    write_worker_status({"ok": False, "state": "error", "request_id": req_id, "message": "failed to write response file"})
 
 
 def write_worker_status(extra: Optional[Dict[str, Any]] = None) -> None:
@@ -121,7 +146,6 @@ def write_worker_status(extra: Optional[Dict[str, Any]] = None) -> None:
     status_path = f"{QUEUE_DIR}/worker_status.json"
     try:
         old_sha = proxy.get_file_sha(status_path)
-        key = os.environ.get("CHAT_QUEUE_KEY", "")
         payload: Dict[str, Any] = {
             "ok": True,
             "state": "idle",
@@ -131,10 +155,10 @@ def write_worker_status(extra: Optional[Dict[str, Any]] = None) -> None:
             "codespace": os.environ.get("CODESPACE_NAME") or os.environ.get("HOSTNAME") or "codespace",
             "pid": os.getpid(),
             "mode": "codespace-worker-relay",
+            "version": WORKER_PROTOCOL_VERSION,
+            "started_at": WORKER_STARTED_AT,
+            "processed_count": PROCESSED_COUNT,
             "message": "worker alive",
-            "worker_ready": True,
-            "key_hash": hashlib.sha256(key.encode("utf-8")).hexdigest()[:16] if key else "",
-            "version": "lowdata-worker-v3",
         }
         if extra:
             payload.update(extra)
@@ -143,6 +167,7 @@ def write_worker_status(extra: Optional[Dict[str, Any]] = None) -> None:
         print(f"[worker] heartbeat failed: {e}", flush=True)
 
 def process_prompt_file(path: str, sha: str) -> None:
+    global PROCESSED_COUNT
     req_id = id_from_prompt_path(path)
     print(f"[worker] processing {path} req_id={req_id}", flush=True)
     write_worker_status({"state": "processing", "request_id": req_id, "message": f"processing {req_id}"})
@@ -155,6 +180,8 @@ def process_prompt_file(path: str, sha: str) -> None:
             data = proxy.decrypt_envelope(raw)
         except Exception as e:
             write_response(req_id, {"error": {"code": 401, "message": str(e)}})
+            if current_sha:
+                proxy.delete_file(path, current_sha)
             write_worker_status({"ok": False, "state": "error", "request_id": req_id, "message": "decrypt failed: " + str(e)[:220]})
             return
         if data.get("id"):
@@ -173,6 +200,7 @@ def process_prompt_file(path: str, sha: str) -> None:
         write_response(req_id, result)
         if current_sha:
             proxy.delete_file(path, current_sha)
+        PROCESSED_COUNT += 1
         write_worker_status({"state": "idle", "last_request_id": req_id, "last_done": time.time(), "message": f"done {req_id}"})
         print(f"[worker] done req_id={req_id}", flush=True)
     except Exception as e:
@@ -193,10 +221,12 @@ def main() -> None:
     write_worker_status({"state": "started", "message": "codespace_worker.py started"})
     while True:
         try:
+            files = list_worker_files()
+            pending = [x for x in files if re.match(r"^prompt_[A-Za-z0-9_-]+\.json$", x.get("name", ""))]
             if time.time() - last_heartbeat >= HEARTBEAT_SECONDS:
-                write_worker_status({"state": "idle"})
+                write_worker_status({"state": "idle", "pending_prompts": len(pending)})
                 last_heartbeat = time.time()
-            for item in list_worker_files():
+            for item in files:
                 path = item.get("path", "")
                 sha = item.get("sha", "")
                 name = item.get("name", "")

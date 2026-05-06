@@ -132,7 +132,6 @@ h1{font-size:24px;margin-top:12px;letter-spacing:-.4px}.sub{font-size:12.5px;col
         <button class="brBtn" onclick="browserAct('frames')">🎞️ تجدید فریم</button>
         <button class="brBtn" id="br-backend" onclick="toggleBrowserBackend()" title="Actions یا Codespace Worker">حالت: Actions</button>
         <button class="brBtn" id="cs-start" onclick="startCodespaceWorker()" title="Codespace را بدون باز کردن VS Code Web روشن می‌کند">▶ روشن کردن Worker</button>
-        <button class="brBtn" id="cs-restart" onclick="restartCodespaceWorker()" title="اگر Codespace روشن است ولی heartbeat نمی‌آید، Stop/Start می‌کند">↻ ری‌استارت Worker</button>
         <button class="brBtn" id="cs-stop" onclick="stopCodespaceWorker()" title="Codespace انتخاب‌شده را خاموش می‌کند">⏹ خاموش</button>
         <button class="brBtn" onclick="browserAct('scroll',{dy:760})">↓ اسکرول</button>
         <button class="brBtn" onclick="browserAct('scroll',{dy:-760})">↑ بالا</button>
@@ -146,7 +145,7 @@ h1{font-size:24px;margin-top:12px;letter-spacing:-.4px}.sub{font-size:12.5px;col
           <h3>دستور مرورگر</h3>
           <div class="cmdBox"><input id="br-cmd" placeholder="مثلا: روی لینک 3 کلیک کن، یا این صفحه را تحلیل کن" onkeydown="if(event.key==='Enter')browserCommand()"><button class="mini" onclick="browserCommand()">اجرا</button></div>
           <button class="mini" onclick="browserAnalyze()">تحلیل AI صفحه</button>
-          <div class="workerPanel" id="worker-panel"><strong>Low‑Data Worker</strong><br><span id="worker-detail">برای حذف مصرف سنگین VS Code Web، Codespace را از همین‌جا روشن/خاموش کن.</span><div class="workerRow"><button class="mini good" onclick="startCodespaceWorker()">روشن کردن</button><button class="mini" onclick="restartCodespaceWorker()">ری‌استارت</button><button class="mini" onclick="repairWorkerStatus()">تعمیر</button><button class="mini" onclick="refreshWorkerStatus(true)">وضعیت</button><button class="mini danger" onclick="stopCodespaceWorker()">خاموش کردن</button></div></div>
+          <div class="workerPanel" id="worker-panel"><strong>Low‑Data Worker</strong><br><span id="worker-detail">برای حذف مصرف سنگین VS Code Web، Codespace را از همین‌جا روشن/خاموش کن.</span><div class="workerRow"><button class="mini good" onclick="startCodespaceWorker()">روشن کردن</button><button class="mini" onclick="refreshWorkerStatus(true)">وضعیت</button><button class="mini danger" onclick="stopCodespaceWorker()">خاموش کردن</button></div></div>
           <div class="noteBox" id="br-note">برای کلیک، هم می‌توانی روی عکس بزنی هم از لیست عناصر پایین استفاده کنی.</div>
           <div class="analysisBox" id="br-analysis" style="display:none"></div>
           <h3>لینک‌ها و دکمه‌های قابل کلیک</h3>
@@ -164,6 +163,7 @@ let browserMode=false, browserLoading=false, browserBackend=localStorage.getItem
 let codespaceName=localStorage.getItem(CSK)||'', codespaceBusy=false, csStatusTimer=null;
 let brFrameTimer=null;
 let proxyWakeAt=0, proxyDefaultBranch=null;
+const WORKER_PROTOCOL_VERSION='2026-05-06-lowdata-v2';
 const GH='https://api.github.com';
 if(window.marked){marked.setOptions({gfm:true,breaks:true,mangle:false,headerIds:false});}
 
@@ -233,21 +233,19 @@ async function ghApiJson(path,opts={}){
   const text=await r.text();
   return text?JSON.parse(text):{};
 }
-async function sha256Short(text){
-  if(!text||!crypto?.subtle)return '';
-  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(buf)).map(x=>x.toString(16).padStart(2,'0')).join('').slice(0,16);
-}
 
 
 // ── Low-data Codespace Worker controls ──
-function codespaceHeaders(){return {'Authorization':`Bearer ${cfg.token}`,'Content-Type':'application/json','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2026-03-10'}}
+function codespaceHeaders(){return {'Authorization':`Bearer ${cfg.token}`,'Content-Type':'application/json','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}}
 async function codespaceApi(path, opts={}){
   const r=await safeFetch(`${GH}${path}`,Object.assign({headers:codespaceHeaders()},opts));
   if(r.status===404)return null;
   if(r.status===401)throw new Error('GitHub token نامعتبر است. برای مدیریت Codespaces باید token معتبر وارد شود.');
   if(r.status===403)throw new Error('توکن اجازه مدیریت Codespaces ندارد. به PAT دسترسی Codespaces lifecycle admin و Contents read/write بده.');
-  if(r.status===409){const t=await r.text().catch(()=>'');return {conflict:true,status:409,message:t||'already running'};}
+  if(r.status===409){
+    const t=await r.text().catch(()=>'');
+    return {conflict:true,status:409,message:t||'codespace already running'};
+  }
   if(!r.ok){const t=await r.text().catch(()=>'');throw new Error('Codespaces API error '+r.status+' '+t.slice(0,180))}
   if(r.status===204)return {};
   const text=await r.text();
@@ -287,47 +285,29 @@ async function readWorkerStatus(){
     return res&&res.data?res.data:null;
   }catch(e){return null}
 }
-async function writeWebWorkerStatus(state='web_waiting', message='منتظر heartbeat تازه از Worker'){
-  try{
-    const old=await ghGet('browser_queue/worker_status.json');
-    const payload={ok:true,state,message,ts:Date.now()/1000,repo:`${cfg.user}/${cfg.repo}`,queue:'browser_queue',codespace:codespaceName||'codespace',pid:0,mode:'web-control',boot:true,worker_ready:false,web_written:true,version:'lowdata-worker-v4'};
-    await ghPut('browser_queue/worker_status.json',payload,old&&old.sha);
-    updateWorkerStatusFromObj(payload);
-    return payload;
-  }catch(e){console.warn('write web worker status failed',e);return null}
-}
 function workerStatusAge(st){return Math.round((Date.now()-Number(st?.ts||0)*1000)/1000)}
-function workerStatusFresh(st, maxAge=45){const age=workerStatusAge(st);return !!(st&&st.worker_ready===true&&st.boot!==true&&st.ok!==false&&Number.isFinite(age)&&age>=-5&&age<maxAge&&['idle','started','processing'].includes(String(st.state||'idle')))}
+function workerStatusFresh(st, maxAge=45){const age=workerStatusAge(st);const verOk=st&&st.version===WORKER_PROTOCOL_VERSION;return !!(st&&verOk&&st.ok!==false&&Number.isFinite(age)&&age>=-5&&age<maxAge&&['idle','started','processing','already_running'].includes(String(st.state||'idle')))}
 function workerStatusText(st){
   if(!st)return codespaceName?`Codespace: ${codespaceName} · منتظر heartbeat`:'Worker نامشخص';
   const age=workerStatusAge(st), state=String(st.state||'idle');
   const msg=st.message?` · ${st.message}`:'';
-  const bad=state==='error'||state==='missing_key'||state==='key_mismatch'||state==='lock_busy'||st.ok===false;
-  const kind=bad?'Worker خطا':(st.worker_ready?'Worker':'Worker boot');
-  return `${kind} · ${st.codespace||codespaceName||'codespace'} · ${Number.isFinite(age)?age+' ثانیه پیش':'همین الان'}${msg}`;
+  const ver=st.version===WORKER_PROTOCOL_VERSION?'':` · نسخه قدیمی/ناسازگار`;
+  const pend=Number.isFinite(Number(st.pending_prompts))?` · صف:${st.pending_prompts}`:'';
+  return `${state==='error'||state==='missing_key'||st.ok===false?'Worker خطا':'Worker'} · ${st.codespace||codespaceName||'codespace'} · ${Number.isFinite(age)?age+' ثانیه پیش':'همین الان'}${pend}${ver}${msg}`;
 }
 function updateWorkerStatusFromObj(st){
   if(!st){setCodeStatus(codespaceName?`Codespace: ${codespaceName} · منتظر heartbeat`:'Worker نامشخص','warn');return}
   const state=String(st.state||'idle');
-  if(state==='error'||state==='missing_key'||state==='key_mismatch'||state==='lock_busy'||st.ok===false){setCodeStatus(workerStatusText(st),'bad');return}
+  if(st.version!==WORKER_PROTOCOL_VERSION){setCodeStatus(workerStatusText(st),'warn');return}
+  if(state==='error'||state==='missing_key'||st.ok===false){setCodeStatus(workerStatusText(st),'bad');return}
   setCodeStatus(workerStatusText(st),workerStatusFresh(st)?'ok':'warn');
-}
-async function annotateWorkerStatus(st){
-  if(!st)return st;
-  if(st.key_hash&&cfg.key){
-    const local=await sha256Short(cfg.key);
-    if(local&&local!==st.key_hash){
-      st=Object.assign({},st,{ok:false,state:'key_mismatch',message:'Security Key سایت با CHAT_QUEUE_KEY داخل Codespace یکی نیست؛ Codespaces Secret را اصلاح کن و Stop/Start بزن'});
-    }
-  }
-  return st;
 }
 async function refreshWorkerStatus(manual=false){
   if(!cfg.user||!cfg.repo||!cfg.token){if(manual)showSetup();return null}
   try{
-    const st=await annotateWorkerStatus(await readWorkerStatus());
+    const st=await readWorkerStatus();
     updateWorkerStatusFromObj(st);
-    if(manual)setBrowserStatus(st?workerStatusText(st):'هنوز heartbeat از Worker پیدا نشد. اگر Codespace روشن است، دکمه ری‌استارت Worker را بزن؛ اگر باز نشد، Rebuild یا Codespace تازه بساز.');
+    if(manual)setBrowserStatus(st?workerStatusText(st):'هنوز heartbeat از Worker پیدا نشد. اگر Codespace را قبل از این نسخه ساخته‌ای، یک‌بار Rebuild یا Codespace تازه بساز.');
     return st;
   }catch(e){if(manual)setBrowserStatus('خطا در خواندن وضعیت Worker: '+e.message);return null}
 }
@@ -344,67 +324,55 @@ async function waitForWorkerReady(maxMs=70000){
 async function startCodespaceWorker(){
   if(codespaceBusy)return; if(!cfg.user||!cfg.repo||!cfg.token)return showSetup();
   codespaceBusy=true; toggleBrowser(true); browserBackend='worker'; localStorage.setItem(BBK,browserBackend); updateBrowserBackendUI(); setCodeStatus('در حال یافتن Codespace...','warn'); setBrowserStatus('در حال روشن کردن Codespace بدون باز کردن VS Code Web...');
-  await writeWebWorkerStatus('web_waiting','دستور روشن کردن ارسال شد؛ منتظر heartbeat تازه از postStartCommand');
   try{
     const cs=await pickCodespace();
     setCodeStatus(`Codespace: ${cs.name} · ${codeStateText(cs)}`,'warn');
     const st=String(cs.state||cs.status||'').toLowerCase();
     if(!/available|ready|started|running/.test(st)){
-      const started=await codespaceApi(`/user/codespaces/${encodeURIComponent(cs.name)}/start`,{method:'POST'});
-      if(started&&started.conflict)setBrowserStatus('Codespace از قبل روشن بود؛ منتظر heartbeat می‌مانم...');
+      await codespaceApi(`/user/codespaces/${encodeURIComponent(cs.name)}/start`,{method:'POST'});
       setCodeStatus(`Codespace: ${cs.name} · در حال روشن شدن`,'warn');
     }else{
-      setBrowserStatus('Codespace روشن است؛ اگر heartbeat نیاید باید ری‌استارت شود.');
+      setBrowserStatus('Codespace از قبل روشن است؛ منتظر heartbeat واقعی Worker می‌مانم...');
     }
-    for(let i=0;i<30;i++){
+
+    let gotFresh=false, lastWs=null;
+    for(let i=0;i<28;i++){
       await sleep(3000);
       const now=await getCodespace(cs.name).catch(()=>null);
-      const ws=await annotateWorkerStatus(await readWorkerStatus());
+      const ws=await readWorkerStatus(); lastWs=ws||lastWs;
       if(ws){
         updateWorkerStatusFromObj(ws);
-        if(ws.state==='error'||ws.state==='missing_key'||ws.state==='key_mismatch'||ws.state==='lock_busy'||ws.ok===false){setBrowserStatus(workerStatusText(ws));return}
-        if(workerStatusFresh(ws)){setBrowserStatus('Worker آماده است؛ حالا URL بده یا روی صفحه کلیک کن.');return}
+        if(ws.state==='error'||ws.state==='missing_key'||ws.ok===false){setBrowserStatus(workerStatusText(ws));return}
+        if(workerStatusFresh(ws)){gotFresh=true;setBrowserStatus('Worker آماده است؛ حالا URL بده یا روی صفحه کلیک کن.');return}
+        if(ws.version!==WORKER_PROTOCOL_VERSION){setBrowserStatus('یک Worker قدیمی یا status قدیمی پیدا شد؛ اگر درست نشد، دکمه خاموش را بزن و دوباره روشن کن.');}
       }else if(now){
-        setCodeStatus(`Codespace: ${cs.name} · ${codeStateText(now)} · منتظر heartbeat`,'warn');
+        setCodeStatus(`Codespace: ${cs.name} · ${codeStateText(now)} · منتظر heartbeat`, 'warn');
       }
       setBrowserStatus(`منتظر auto-start شدن Worker... ${i+1}`);
     }
-    setBrowserStatus('Codespace روشن است ولی heartbeat نرسید. دکمه «ری‌استارت Worker» را بزن؛ اگر باز نشد، devcontainer را Rebuild یا Codespace تازه بساز و مطمئن شو CHAT_QUEUE_KEY در Codespaces Secret تنظیم شده.');
-    setCodeStatus(`Codespace: ${cs.name} · بدون heartbeat`,'warn');
+
+    // If the Codespace was already running but the worker did not start, a stop/start is
+    // usually enough to re-run postStartCommand without opening the heavy Codespaces UI.
+    if(!gotFresh){
+      setBrowserStatus('Worker heartbeat نداد؛ یک بار Codespace را سبک restart می‌کنم...');
+      try{await codespaceApi(`/user/codespaces/${encodeURIComponent(cs.name)}/stop`,{method:'POST'}); await sleep(12000)}catch(e){}
+      try{await codespaceApi(`/user/codespaces/${encodeURIComponent(cs.name)}/start`,{method:'POST'})}catch(e){}
+      for(let i=0;i<36;i++){
+        await sleep(3500);
+        const ws=await readWorkerStatus(); lastWs=ws||lastWs;
+        if(ws){
+          updateWorkerStatusFromObj(ws);
+          if(ws.state==='error'||ws.state==='missing_key'||ws.ok===false){setBrowserStatus(workerStatusText(ws));return}
+          if(workerStatusFresh(ws)){setBrowserStatus('Worker بعد از restart آماده شد؛ حالا URL بده.');return}
+        }
+        setBrowserStatus(`بعد از restart منتظر Worker... ${i+1}`);
+      }
+    }
+    setBrowserStatus(lastWs?('Worker آماده نشد: '+workerStatusText(lastWs)):'Codespace روشن شد، ولی heartbeat Worker نرسید. اگر Codespace قدیمی است Rebuild یا یک Codespace تازه بساز؛ CHAT_QUEUE_KEY را هم در Codespaces Secrets چک کن.');
+    setCodeStatus(`Codespace: ${cs.name} · بدون heartbeat سازگار`,'warn');
   }catch(e){setBrowserStatus('خطا: '+e.message); setCodeStatus('خطا در روشن کردن Worker','bad')}
   finally{codespaceBusy=false;updateBrowserBackendUI()}
 }
-async function restartCodespaceWorker(){
-  if(codespaceBusy)return; if(!cfg.user||!cfg.repo||!cfg.token)return showSetup();
-  codespaceBusy=true; toggleBrowser(true); browserBackend='worker'; localStorage.setItem(BBK,browserBackend); updateBrowserBackendUI();
-  try{
-    const cs=await pickCodespace();
-    await writeWebWorkerStatus('web_waiting','ری‌استارت شروع شد؛ heartbeat قبلی نادیده گرفته شد');
-    setBrowserStatus('در حال ری‌استارت Codespace برای اجرای postStartCommand...');
-    setCodeStatus(`Codespace: ${cs.name} · ری‌استارت`,'warn');
-    try{await codespaceApi(`/user/codespaces/${encodeURIComponent(cs.name)}/stop`,{method:'POST'});}catch(e){setBrowserStatus('Stop خطا داد، ولی Start را امتحان می‌کنم: '+e.message)}
-    for(let i=0;i<30;i++){
-      await sleep(2500);
-      const now=await getCodespace(cs.name).catch(()=>null);
-      const st=String(now?.state||now?.status||'').toLowerCase();
-      if(!now||/shutdown|shut|stopped/.test(st))break;
-      setBrowserStatus(`در حال خاموش شدن Codespace... ${i+1}`);
-    }
-    const r=await codespaceApi(`/user/codespaces/${encodeURIComponent(cs.name)}/start`,{method:'POST'});
-    if(r&&r.conflict)setBrowserStatus('Codespace قبلاً روشن شده؛ منتظر heartbeat می‌مانم...');
-    codespaceBusy=false;
-    return await startCodespaceWorker();
-  }catch(e){setBrowserStatus('خطا در ری‌استارت Worker: '+e.message);setCodeStatus('ری‌استارت ناموفق','bad')}
-  finally{codespaceBusy=false;updateBrowserBackendUI()}
-}
-
-async function repairWorkerStatus(){
-  if(codespaceBusy)return; if(!cfg.user||!cfg.repo||!cfg.token)return showSetup();
-  await writeWebWorkerStatus('web_waiting','وضعیت قدیمی پاک شد؛ اگر heartbeat نیامد، ری‌استارت Worker را بزن');
-  setBrowserStatus('وضعیت قدیمی پاک شد. حالا اگر چراغ سبز نشد، ری‌استارت Worker را بزن.');
-  await refreshWorkerStatus(false);
-}
-
 async function stopCodespaceWorker(){
   if(codespaceBusy)return; if(!cfg.user||!cfg.repo||!cfg.token)return showSetup();
   codespaceBusy=true; setBrowserStatus('در حال خاموش کردن Codespace...');
@@ -639,22 +607,24 @@ async function pollResponse(id,opts={}){
     if(isBrowser)setBrowserStatus(lastErr?base+' · '+lastErr:base); else setStatus(lastErr?base+' · '+lastErr:base);
     try{
       const res=await ghGet(path);
-      if(res&&res.data){
-        try{const obj=await decryptObj(res.data);ghDel(path,res.sha);return obj}
-        catch(decErr){throw new Error('پاسخ Worker پیدا شد ولی باز نشد؛ معمولاً Security Key سایت با CHAT_QUEUE_KEY داخل Codespace یکی نیست. '+(((decErr&&decErr.message)||decErr||'').slice(0,80)))}
-      }
+      if(res&&res.data){const obj=await decryptObj(res.data);ghDel(path,res.sha);return obj}
       lastErr='';
     }catch(e){
-      lastErr=((e&&e.message)||String(e)).slice(0,120);
-      if(/Security Key|token|401|403|rate limit|دسترسی/.test(lastErr))throw e;
+      lastErr=((e&&e.message)||String(e)).slice(0,90);
+      if(/token|401|403|rate limit|دسترسی/.test(lastErr))throw e;
     }
     if(isWorker && n%5===0){
-      const ws=await annotateWorkerStatus(await readWorkerStatus());
+      const ws=await readWorkerStatus();
       if(ws){
         updateWorkerStatusFromObj(ws);
-        if(ws.state==='error'||ws.state==='missing_key'||ws.state==='key_mismatch'||ws.state==='lock_busy'||ws.ok===false)throw new Error(workerStatusText(ws));
+        if(ws.state==='error'||ws.state==='missing_key'||ws.ok===false)throw new Error(workerStatusText(ws));
+        if(ws.version!==WORKER_PROTOCOL_VERSION)throw new Error('Worker قدیمی است یا auto-start نسخه جدید اجرا نشده: '+workerStatusText(ws));
         if(!workerStatusFresh(ws,95)&&n>12)throw new Error('heartbeat قدیمی شد: '+workerStatusText(ws));
       }
+      try{
+        const pr=await ghGet(`${queueDir}/prompt_${id}.json`);
+        if(pr&&ws&&workerStatusFresh(ws,95)&&n>20){lastErr='درخواست هنوز در صف مانده؛ Worker زنده است ولی این prompt را برنداشته. Stop/Start Worker را بزن.'}
+      }catch(e){}
     }
     if(!isWorker && n%6===0){
       try{
@@ -668,7 +638,7 @@ async function pollResponse(id,opts={}){
     }
     if(!isWorker && n===8){try{await wakeProxyLoop()}catch(e){lastErr=((e&&e.message)||String(e)).slice(0,90)}}
   }
-  if(isWorker)throw new Error('timeout؛ پاسخ Worker ساخته نشد. احتمالاً worker واقعاً پردازش نمی‌کند یا با devcontainer قدیمی بالا آمده. دکمه تعمیر/ری‌استارت Worker را بزن؛ اگر heartbeat نیامد Codespace تازه بساز یا Rebuild کن.');
+  if(isWorker)throw new Error('timeout؛ پاسخ Worker ساخته نشد. در Codespace ترمینال worker را اجرا و CHAT_QUEUE_KEY/GH_TOKEN/REPO را چک کن.');
   throw new Error('timeout؛ پاسخ ساخته نشد. تب Actions را چک کن؛ احتمالاً workflow اجرا نشده، خطا داده یا token دسترسی workflow ندارد.')
 }
 
@@ -685,15 +655,17 @@ async function browserAct(action,extra={}){
   try{
     const [provider,model]=$('model').value.split('|'); const id='br_'+uid();
     const queueDir=browserBackend==='worker'?'browser_queue':'queue';
-    const payload=Object.assign({id,type:'browser',browser_session:browserState.sid,action,provider,model,backend:browserBackend},extra||{});
-    const envelope=await encryptObj(payload); await ghPut(`${queueDir}/prompt_${id}.json`,envelope,null);
     if(browserBackend==='worker'){
-      const ws=await annotateWorkerStatus(await readWorkerStatus());
+      const ws=await readWorkerStatus();
       if(!workerStatusFresh(ws,60)){
         setBrowserStatus('Worker آماده نیست؛ اول وضعیت را تازه می‌کنم...');
         await waitForWorkerReady(55000);
       }
-      setBrowserStatus('منتظر Codespace Worker...');
+    }
+    const payload=Object.assign({id,type:'browser',browser_session:browserState.sid,action,provider,model,backend:browserBackend},extra||{});
+    const envelope=await encryptObj(payload); await ghPut(`${queueDir}/prompt_${id}.json`,envelope,null);
+    if(browserBackend==='worker'){
+      setBrowserStatus('درخواست به Worker رسید؛ منتظر پردازش...');
     }else{
       setBrowserStatus('در حال روشن کردن Action...');
       await wakeProxyLoop();
