@@ -65,12 +65,15 @@ if ! flock -n 9; then
   exit 0
 fi
 
-if [ ! -f .worker_deps_ready ]; then
+if [ ! -f .worker_deps_ready_v2 ] || ! python - <<'PYCHK' >/dev/null 2>&1
+import PIL, playwright, requests, cryptography
+PYCHK
+then
   log "installing dependencies/playwright if needed"
 python scripts/worker_status.py installing "در حال نصب وابستگی‌ها و Chromium؛ بار اول ممکن است چند دقیقه طول بکشد" || true
-  python -m pip install -q requests cryptography playwright || { errlog "pip install failed"; python scripts/worker_status.py error "pip install failed" || true; exit 11; }
+  python -m pip install -q requests cryptography pillow playwright || { errlog "pip install failed"; python scripts/worker_status.py error "pip install failed" || true; exit 11; }
   python -m playwright install --with-deps chromium || { errlog "playwright chromium install failed"; python scripts/worker_status.py error "playwright chromium install failed" || true; exit 12; }
-  touch .worker_deps_ready
+  touch .worker_deps_ready_v2
 fi
 
 log "dependencies ready; launching codespace_worker.py"
