@@ -487,7 +487,7 @@ function browserCommand(){const command=$('br-cmd').value.trim(); if(!command)re
 function browserAnalyze(){const command=$('br-cmd').value.trim()||'این صفحه را خلاصه و تحلیل کن'; browserAct('analyze',{command})}
 function browserClickIndex(i){browserAct('click_index',{index:i})}
 function browserTypeIndex(i){const text=window.prompt('متنی که باید وارد شود:'); if(text!==null&&text!=='')browserAct('type_index',{index:i,text})}
-function browserClickShot(ev){if(browserLoading)return; const img=$('br-shot'); if(!img.src)return; const r=img.getBoundingClientRect(); const x=Math.round((ev.clientX-r.left)*(img.naturalWidth/r.width)); const y=Math.round((ev.clientY-r.top)*(img.naturalHeight/r.height)); browserAct('click_xy',{x,y})}
+function browserClickShot(ev){if(browserLoading)return; const img=$('br-shot'); if(!img.src)return; const r=img.getBoundingClientRect(); const scale=Number(browserState.last?.device_scale_factor||1); const rawX=(ev.clientX-r.left)*(img.naturalWidth/r.width); const rawY=(ev.clientY-r.top)*(img.naturalHeight/r.height); const x=Math.round(rawX/scale); const y=Math.round(rawY/scale); browserAct('click_xy',{x,y})}
 function playBrowserFrames(frames, finalSrc){
   const img=$('br-shot'), badge=$('br-clip');
   if(brFrameTimer){clearInterval(brFrameTimer);brFrameTimer=null}
@@ -499,7 +499,7 @@ function playBrowserFrames(frames, finalSrc){
     i++;
     if(i<list.length){img.src=list[i];return}
     clearInterval(brFrameTimer);brFrameTimer=null;img.src=finalSrc||list[list.length-1]||'';badge.classList.remove('on');
-  },220);
+  },150);
 }
 function renderBrowser(b){
   browserState.last=b; saveBrowserState();

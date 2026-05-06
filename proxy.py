@@ -669,7 +669,7 @@ def _get_browser_session(sid: str) -> Dict[str, Any]:
     browser = _ensure_browser()
     context = browser.new_context(
         viewport={"width": 1180, "height": 820},
-        device_scale_factor=1,
+        device_scale_factor=1.5,
         locale="fa-IR",
         timezone_id="Asia/Tehran",
         ignore_https_errors=True,
@@ -751,12 +751,12 @@ def _safe_wait(page) -> None:
 
 
 
-def _capture_browser_jpeg(page, quality: int = 88, max_chars: int = 520_000) -> str:
+def _capture_browser_jpeg(page, quality: int = 94, max_chars: int = 1_200_000) -> str:
     # High-quality viewport screenshot. JPEG keeps queue files smaller than PNG while quality remains clear.
     # The max_chars cap prevents GitHub API fetches from hanging on very large JSON responses.
     q = int(quality)
     last = b""
-    while q >= 66:
+    while q >= 76:
         shot = page.screenshot(type="jpeg", quality=q, full_page=False)
         last = shot
         data = "data:image/jpeg;base64," + base64.b64encode(shot).decode("ascii")
@@ -770,7 +770,7 @@ def _data_url_chars(items: List[str]) -> int:
     return sum(len(x or "") for x in items)
 
 
-def _trim_frames_for_queue(frames: List[str], final_shot: str, max_chars: int = 420_000) -> List[str]:
+def _trim_frames_for_queue(frames: List[str], final_shot: str, max_chars: int = 3_800_000) -> List[str]:
     """Keep the clip small enough for GitHub Contents API polling.
 
     The stable final screenshot is sent separately, so transition frames intentionally
@@ -791,7 +791,7 @@ def _trim_frames_for_queue(frames: List[str], final_shot: str, max_chars: int = 
     return []
 
 
-def _capture_transition_frames(page, count: int = 4, delay_ms: int = 220, quality: int = 86) -> List[str]:
+def _capture_transition_frames(page, count: int = 8, delay_ms: int = 140, quality: int = 92) -> List[str]:
     """Capture a short, high-quality 'live-ish' clip after an action.
 
     It is intentionally a finite clip, not an endless stream, to avoid abusing GitHub
@@ -810,7 +810,7 @@ def _capture_transition_frames(page, count: int = 4, delay_ms: int = 220, qualit
             pass
     _safe_wait(page)
     try:
-        final_frame = _capture_browser_jpeg(page, quality=max(quality, 90))
+        final_frame = _capture_browser_jpeg(page, quality=max(quality, 96), max_chars=1_600_000)
         frames.append(final_frame)
     except Exception as e:
         print(f"final frame capture failed: {e}")
@@ -825,7 +825,7 @@ def _state_payload(sess: Dict[str, Any], note: str = "", analysis: str = "", ani
         frames = _trim_frames_for_queue(raw_frames[:-1], screenshot)
     else:
         _safe_wait(page)
-        screenshot = _capture_browser_jpeg(page, quality=90)
+        screenshot = _capture_browser_jpeg(page, quality=96, max_chars=1_600_000)
         frames = []
     title = ""
     url = ""
@@ -851,6 +851,8 @@ def _state_payload(sess: Dict[str, Any], note: str = "", analysis: str = "", ani
             "elements": elements,
             "text_preview": text,
             "ts": int(time.time()),
+            "device_scale_factor": 1.5,
+            "frame_profile": "hq-8frames",
         },
         "meta": {"provider": "github-actions", "model": "playwright/chromium", "requested_model": "browser-agent"},
     }
