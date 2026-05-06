@@ -1,6 +1,7 @@
 import base64
 import json
 import io
+import mimetypes
 import os
 import re
 import time
@@ -8,6 +9,7 @@ import traceback
 import urllib.parse
 import ipaddress
 import socket
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
@@ -41,6 +43,11 @@ POLL_SECONDS = 3
 REQUEST_TIMEOUT = 120
 BROWSER_FRAME_COUNT = int(os.environ.get("BROWSER_FRAME_COUNT", "25"))
 BROWSER_FRAME_FILE_MAX_CHARS = int(os.environ.get("BROWSER_FRAME_FILE_MAX_CHARS", "36000000"))
+BROWSER_DOWNLOAD_DIR = os.environ.get("BROWSER_DOWNLOAD_DIR", "browser_downloads")
+DOWNLOAD_RELEASE_TAG = os.environ.get("DOWNLOAD_RELEASE_TAG", "browser-downloads")
+DOWNLOAD_RELEASE_NAME = os.environ.get("DOWNLOAD_RELEASE_NAME", "Remote Browser Downloads")
+DOWNLOAD_UPLOAD_TO_RELEASE = os.environ.get("DOWNLOAD_UPLOAD_TO_RELEASE", "1").lower() not in ("0", "false", "no")
+DOWNLOAD_MAX_RELEASE_BYTES = int(os.environ.get("DOWNLOAD_MAX_RELEASE_BYTES", str(2 * 1024 * 1024 * 1024 - 16 * 1024 * 1024)))
 
 # ─────────────────────────────────────────────────────────────────────────────
 # GitHub content helpers
@@ -133,6 +140,58 @@ def delete_file(path: str, sha: str) -> bool:
         print(f"delete_file failed {path}: {r.status_code} {r.text[:300]}")
         return False
     return True
+
+def _github_request_json(method: str, url: str, **kwargs) -> Any:
+    headers = dict(GH_HEADERS)
+    headers.setdefault("X-GitHub-Api-Version", "2022-11-28")
+    r = requests.request(method, url, headers=headers, timeout=kwargs.pop("timeout", 45), **kwargs)
+    if r.status_code == 404:
+        return None
+    if r.status_code not in (200, 201, 202, 204):
+        raise RuntimeError(f"GitHub API error {r.status_code}: {r.text[:500]}")
+    if not r.text:
+        return {}
+    return r.json()
+
+
+def get_or_create_download_release() -> Dict[str, Any]:
+    """Return the fixed release used for browser downloads, creating it if needed."""
+    release = _github_request_json("GET", f"{BASE}/repos/{REPO}/releases/tags/{urllib.parse.quote(DOWNLOAD_RELEASE_TAG, safe='')}")
+    if isinstance(release, dict) and release.get("id"):
+        return release
+    body = {
+        "tag_name": DOWNLOAD_RELEASE_TAG,
+        "name": DOWNLOAD_RELEASE_NAME,
+        "body": "Files captured by the Git-AI remote browser. You can delete assets here when you no longer need them.",
+        "draft": False,
+        "prerelease": False,
+    }
+    return _github_request_json("POST", f"{BASE}/repos/{REPO}/releases", json=body, timeout=60)
+
+
+def upload_release_asset(file_path: str, asset_name: str, content_type: Optional[str] = None) -> Dict[str, Any]:
+    """Upload a local file as a GitHub Release asset and return asset metadata."""
+    file_path = str(file_path)
+    size = os.path.getsize(file_path)
+    if size > DOWNLOAD_MAX_RELEASE_BYTES:
+        raise RuntimeError(f"فایل برای Release خیلی بزرگ است: {size} bytes")
+    release = get_or_create_download_release()
+    upload_url = (release.get("upload_url") or "").split("{", 1)[0]
+    if not upload_url:
+        raise RuntimeError("upload_url release پیدا نشد.")
+    content_type = content_type or mimetypes.guess_type(asset_name)[0] or "application/octet-stream"
+    url = upload_url + "?name=" + urllib.parse.quote(asset_name)
+    headers = {
+        "Authorization": f"token {GH_TOKEN}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": content_type,
+    }
+    with open(file_path, "rb") as f:
+        r = requests.post(url, headers=headers, data=f, timeout=max(120, min(1800, 60 + size // 250000)))
+    if r.status_code not in (200, 201):
+        raise RuntimeError(f"upload release asset failed {r.status_code}: {r.text[:700]}")
+    return r.json()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Public-repo queue encryption: AES-GCM + PBKDF2-SHA256
@@ -644,6 +703,82 @@ def _safe_url(url: str) -> str:
     return urllib.parse.urlunparse(parsed)
 
 
+def _safe_filename(name: str, fallback: str = "download.bin") -> str:
+    name = (name or fallback).strip().replace("\\", "_").replace("/", "_")
+    bad = '<>:"|?*'
+    name = ''.join('_' if (ord(ch) < 32 or ord(ch) == 127 or ch in bad) else ch for ch in name)
+    name = re.sub(r"\s+", " ", name).strip(" ._")
+    if not name:
+        name = fallback
+    return name[:180]
+
+
+def _append_download(sess: Dict[str, Any], item: Dict[str, Any]) -> None:
+    downloads = sess.setdefault("downloads", [])
+    downloads.append(item)
+    sess["downloads"] = downloads[-30:]
+
+
+def _handle_browser_download(sess: Dict[str, Any], download) -> None:
+    """Persist a Playwright download locally and, when possible, upload it to a GitHub Release."""
+    started = time.time()
+    sid = _safe_filename(str(sess.get("sid") or "default"), "default")
+    suggested = "download.bin"
+    source_url = ""
+    try:
+        suggested = download.suggested_filename or suggested
+    except Exception:
+        pass
+    try:
+        source_url = download.url or ""
+    except Exception:
+        pass
+    base_name = _safe_filename(suggested, "download.bin")
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    suffix = f"{int((time.time() % 1) * 1000):03d}"
+    local_dir = Path(BROWSER_DOWNLOAD_DIR).resolve() / sid
+    local_dir.mkdir(parents=True, exist_ok=True)
+    local_name = f"{stamp}-{suffix}-{base_name}"
+    local_path = local_dir / local_name
+    item: Dict[str, Any] = {
+        "filename": base_name,
+        "local_name": local_name,
+        "local_path": str(local_path),
+        "source_url": source_url,
+        "status": "saving",
+        "started_at": int(started),
+    }
+    try:
+        download.save_as(str(local_path))
+        failure = None
+        try:
+            failure = download.failure()
+        except Exception:
+            failure = None
+        if failure:
+            raise RuntimeError(str(failure))
+        size = local_path.stat().st_size if local_path.exists() else 0
+        item.update({"status": "saved", "size": size, "saved_at": int(time.time())})
+        if DOWNLOAD_UPLOAD_TO_RELEASE:
+            try:
+                ext_name = _safe_filename(local_name, base_name)
+                ctype = mimetypes.guess_type(ext_name)[0] or "application/octet-stream"
+                asset = upload_release_asset(str(local_path), ext_name, ctype)
+                item.update({
+                    "status": "released",
+                    "release_tag": DOWNLOAD_RELEASE_TAG,
+                    "release_asset_name": asset.get("name") or ext_name,
+                    "release_url": asset.get("browser_download_url") or asset.get("html_url") or "",
+                    "asset_id": asset.get("id"),
+                    "uploaded_at": int(time.time()),
+                })
+            except Exception as e:
+                item.update({"status": "saved_not_released", "release_error": str(e)[:500]})
+    except Exception as e:
+        item.update({"status": "failed", "error": str(e)[:600]})
+    _append_download(sess, item)
+
+
 def _ensure_browser():
     global _pw, _browser
     if _browser is not None:
@@ -653,8 +788,10 @@ def _ensure_browser():
     except Exception as e:
         raise RuntimeError("Playwright نصب نیست. workflow را با dependency جدید اجرا کن: pip install playwright و python -m playwright install chromium") from e
     _pw = sync_playwright().start()
+    Path(BROWSER_DOWNLOAD_DIR).mkdir(parents=True, exist_ok=True)
     _browser = _pw.chromium.launch(
         headless=True,
+        downloads_path=str(Path(BROWSER_DOWNLOAD_DIR).resolve()),
         args=[
             "--disable-dev-shm-usage",
             "--no-sandbox",
@@ -672,6 +809,7 @@ def _get_browser_session(sid: str) -> Dict[str, Any]:
     browser = _ensure_browser()
     context = browser.new_context(
         viewport={"width": 1180, "height": 820},
+        accept_downloads=True,
         device_scale_factor=1.5,
         locale="fa-IR",
         timezone_id="Asia/Tehran",
@@ -683,7 +821,12 @@ def _get_browser_session(sid: str) -> Dict[str, Any]:
     )
     page = context.new_page()
     page.set_default_timeout(30000)
-    sess = {"sid": sid, "context": context, "page": page, "created": time.time(), "updated": time.time()}
+    sess = {"sid": sid, "context": context, "page": page, "downloads": [], "created": time.time(), "updated": time.time()}
+    try:
+        page.on("download", lambda d: _handle_browser_download(sess, d))
+        context.on("page", lambda p: p.on("download", lambda d: _handle_browser_download(sess, d)))
+    except Exception as e:
+        print(f"download listener failed: {e}")
     BROWSER_SESSIONS[sid] = sess
     return sess
 
@@ -966,6 +1109,7 @@ def _state_payload(sess: Dict[str, Any], note: str = "", analysis: str = "", ani
             "frame_profile": "hq-25frames-webp-split",
             "frames_path": "",
             "frames_count": len(frames),
+            "downloads": sess.get("downloads", [])[-20:],
         },
         "meta": {"provider": "github-actions", "model": "playwright/chromium", "requested_model": "browser-agent"},
     }
@@ -1105,6 +1249,25 @@ def run_browser_request(data: Dict[str, Any]) -> Dict[str, Any]:
         elif action == "reload":
             page.reload(wait_until="domcontentloaded", timeout=30000)
             note = "صفحه تازه‌سازی شد."
+        elif action == "download_index":
+            idx = int(data.get("index") or _extract_number(command) or 0)
+            e = _element_by_index(page, idx)
+            if not e:
+                raise RuntimeError(f"عنصر شماره {idx} پیدا نشد.")
+            href = e.get("href") or ""
+            before = len(sess.get("downloads", []))
+            note = _click_element(page, e)
+            try:
+                page.wait_for_timeout(1800)
+            except Exception:
+                pass
+            after = len(sess.get("downloads", []))
+            if after > before:
+                note = "دانلود گرفته شد و برای آپلود در Release پردازش شد."
+            elif href:
+                note = f"روی لینک دانلود کلیک شد، اما download event ثبت نشد. لینک قابل کپی: {href}"
+            else:
+                note = "کلیک انجام شد، اما download event ثبت نشد."
         elif action in ("frames", "refresh_frames", "capture_frames"):
             note = "۲۵ فریم تازه از وضعیت فعلی صفحه گرفته شد."
         elif action == "analyze":

@@ -24,7 +24,7 @@ BASE = "https://api.github.com"
 QUEUE_DIR = os.environ.get("WORKER_QUEUE_DIR", "browser_queue").strip("/") or "browser_queue"
 POLL_SECONDS = float(os.environ.get("WORKER_POLL_SECONDS", "1.2"))
 HEARTBEAT_SECONDS = float(os.environ.get("WORKER_HEARTBEAT_SECONDS", "8"))
-WORKER_PROTOCOL_VERSION = "2026-05-06-lowdata-v3"
+WORKER_PROTOCOL_VERSION = "2026-05-06-downloads-v4"
 WORKER_STARTED_AT = time.time()
 PROCESSED_COUNT = 0
 
