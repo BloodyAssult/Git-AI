@@ -213,3 +213,36 @@ export GROQ_API_KEY=...
 - لایو واقعی WebSocket/noVNC نیست؛ اما نسبت به Actions startup کمتری دارد و نزدیک‌تر به لایو است.
 - اگر Worker خاموش باشد، سایت روی حالت Worker منتظر می‌ماند و timeout می‌دهد. با زدن دوباره‌ی دکمه می‌توانی به حالت Actions برگردی.
 - برای repo عمومی، `CHAT_QUEUE_KEY` را حتماً بگذار تا درخواست‌ها و پاسخ‌ها رمزنگاری شوند.
+
+## Low-Data Worker Mode / روشن و خاموش کردن Codespace بدون لود VS Code Web
+
+در نسخه جدید، لازم نیست برای اجرای worker هر بار محیط سنگین Codespaces/VS Code Web را باز کنی. داخل سایت GitHub Pages، در تب مرورگر این دکمه‌ها اضافه شده‌اند:
+
+- **▶ روشن کردن Worker**: Codespace موجود همین repo را با GitHub API روشن می‌کند. بعد از start شدن container، `postStartCommand` خودش worker را در background اجرا می‌کند.
+- **⏹ خاموش**: Codespace انتخاب‌شده را stop می‌کند تا core-hour مصرف نشود.
+- **وضعیت**: heartbeat فایل `browser_queue/worker_status.json` را می‌خواند و نشان می‌دهد worker زنده است یا نه.
+
+برای اینکه auto-start بدون باز کردن ترمینال کار کند، این مقدارها را به عنوان **Codespaces Secrets** برای همین repo اضافه کن:
+
+```text
+CHAT_QUEUE_KEY=همان Security Key سایت
+GH_TOKEN=توکن با Contents read/write برای همین repo
+REPO=username/repo
+AVALAI_API_KEY=...      # اختیاری، برای تحلیل AI داخل Worker
+HF_TOKEN=...            # اختیاری
+OPENROUTER_API_KEY=...  # اختیاری
+GEMINI_API_KEY=...      # اختیاری
+```
+
+توکن داخل خود سایت، برای دکمه‌های Start/Stop باید علاوه بر Contents read/write، دسترسی **Codespaces lifecycle admin** هم داشته باشد. در fine-grained PAT برای همین repo این موارد را بده:
+
+```text
+Contents: Read and write
+Codespaces lifecycle admin: Read and write
+Codespaces metadata/read: Read
+Actions/Workflows: Read and write  # فقط اگر هنوز حالت Actions را هم استفاده می‌کنی
+```
+
+اگر Codespace هنوز ساخته نشده باشد، سایت نمی‌تواند حدس بزند کدام branch/machine را می‌خواهی؛ یک‌بار از GitHub برای همین repo Codespace بساز. بعد از آن دیگر لازم نیست صفحه Codespaces را باز کنی؛ از دکمه‌های داخل همین سایت روشن/خاموش کن.
+
+برای کاهش مصرف ماهانه، اگر ۴ core گذاشته‌ای ولی کار مرورگر معمولی است، ۲ core معمولاً کافی است. هزینه/سهمیه Codespaces بر اساس core-hour حساب می‌شود؛ یعنی ۴ core در هر ساعت دو برابر ۲ core مصرف می‌کند.

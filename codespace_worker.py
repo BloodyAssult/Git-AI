@@ -23,6 +23,7 @@ import requests
 BASE = "https://api.github.com"
 QUEUE_DIR = os.environ.get("WORKER_QUEUE_DIR", "browser_queue").strip("/") or "browser_queue"
 POLL_SECONDS = float(os.environ.get("WORKER_POLL_SECONDS", "1.2"))
+HEARTBEAT_SECONDS = float(os.environ.get("WORKER_HEARTBEAT_SECONDS", "25"))
 
 
 def _run(cmd: List[str]) -> str:
@@ -112,9 +113,33 @@ def write_response(req_id: str, result: Any) -> None:
         proxy.put_file(resp_path, proxy.encrypt_envelope(lean), old_sha)
 
 
+
+
+def write_worker_status(extra: Optional[Dict[str, Any]] = None) -> None:
+    """Write a tiny clear-text heartbeat for the GitHub Pages UI."""
+    status_path = f"{QUEUE_DIR}/worker_status.json"
+    try:
+        old_sha = proxy.get_file_sha(status_path)
+        payload: Dict[str, Any] = {
+            "ok": True,
+            "ts": time.time(),
+            "repo": REPO,
+            "queue": QUEUE_DIR,
+            "codespace": os.environ.get("CODESPACE_NAME") or os.environ.get("HOSTNAME") or "codespace",
+            "pid": os.getpid(),
+            "mode": "codespace-worker-relay",
+            "message": "worker alive",
+        }
+        if extra:
+            payload.update(extra)
+        proxy.put_file(status_path, payload, old_sha)
+    except Exception as e:
+        print(f"[worker] heartbeat failed: {e}", flush=True)
+
 def process_prompt_file(path: str, sha: str) -> None:
     req_id = id_from_prompt_path(path)
     print(f"[worker] processing {path} req_id={req_id}", flush=True)
+    write_worker_status({"state": "processing", "request_id": req_id})
     current_sha: Optional[str] = sha
     try:
         raw, current_sha = proxy.get_file(path)
@@ -141,6 +166,7 @@ def process_prompt_file(path: str, sha: str) -> None:
         write_response(req_id, result)
         if current_sha:
             proxy.delete_file(path, current_sha)
+        write_worker_status({"state": "idle", "last_request_id": req_id, "last_done": time.time()})
         print(f"[worker] done req_id={req_id}", flush=True)
     except Exception as e:
         print(f"[worker] error: {e}", flush=True)
@@ -155,8 +181,13 @@ def main() -> None:
     print("Encryption:", "ON" if proxy.CHAT_QUEUE_KEY else "OFF - set CHAT_QUEUE_KEY to match the web UI")
     print("Stop with Ctrl+C")
     processed = set()
+    last_heartbeat = 0.0
+    write_worker_status({"state": "started"})
     while True:
         try:
+            if time.time() - last_heartbeat >= HEARTBEAT_SECONDS:
+                write_worker_status({"state": "idle"})
+                last_heartbeat = time.time()
             for item in list_worker_files():
                 path = item.get("path", "")
                 sha = item.get("sha", "")
@@ -169,6 +200,7 @@ def main() -> None:
                 process_prompt_file(path, sha)
                 processed.add(key)
         except KeyboardInterrupt:
+            write_worker_status({"ok": False, "state": "stopped", "message": "worker stopped by user"})
             print("\nWorker stopped.")
             return
         except Exception as e:

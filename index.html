@@ -37,6 +37,7 @@ h1{font-size:24px;margin-top:12px;letter-spacing:-.4px}.sub{font-size:12.5px;col
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 
 .brClip{display:none;position:absolute;left:12px;top:10px;z-index:3;color:#dffcff;font-size:11px;background:rgba(3,8,23,.58);border:1px solid rgba(34,211,238,.28);border-radius:999px;padding:6px 10px;backdrop-filter:blur(10px);box-shadow:0 10px 28px rgba(0,0,0,.22);pointer-events:none}.brClip.on{display:block}.brFullBtn{position:absolute;left:12px;bottom:12px;z-index:4;border:1px solid rgba(255,255,255,.18);border-radius:14px;background:rgba(3,8,23,.58);color:#e6fbff;padding:9px 12px;font-weight:950;font-size:12px;backdrop-filter:blur(12px);box-shadow:0 14px 36px rgba(0,0,0,.28)}.brFullBtn:hover{background:rgba(34,211,238,.16);border-color:rgba(34,211,238,.36)}.shotWrap.shotFull,#shotWrap:fullscreen{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;z-index:120!important;border-radius:0!important;border:0!important;background:#020617!important;display:flex!important;align-items:center!important;justify-content:center!important;overflow:auto!important;padding:10px!important}.shotWrap.shotFull:before,#shotWrap:fullscreen:before{top:14px;right:14px}.shotWrap.shotFull img,#shotWrap:fullscreen img{max-width:100%!important;max-height:100%!important;width:auto!important;height:auto!important;object-fit:contain!important}.shotWrap.shotFull .brFullBtn,#shotWrap:fullscreen .brFullBtn{left:16px;bottom:16px;background:rgba(15,23,42,.82);font-size:13px;padding:11px 14px}
+.csDot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted2);margin-left:6px;vertical-align:middle}.csDot.ok{background:var(--green);box-shadow:0 0 16px rgba(52,211,153,.55)}.csDot.warn{background:var(--amber);box-shadow:0 0 16px rgba(251,191,36,.45)}.csDot.bad{background:var(--red);box-shadow:0 0 16px rgba(251,113,133,.45)}.workerPanel{border:1px solid rgba(34,211,238,.22);background:rgba(34,211,238,.055);border-radius:16px;padding:9px;margin:8px 0 9px;font-size:11.5px;line-height:1.85;color:var(--muted)}.workerPanel strong{color:#eafcff}.workerRow{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.mini.danger{border-color:rgba(251,113,133,.28);background:rgba(251,113,133,.10);color:#ffdbe2}.mini.good{border-color:rgba(52,211,153,.28);background:rgba(52,211,153,.10);color:#d7fff0}
 @media(max-width:900px){.browserBody{grid-template-columns:1fr}.browserSide{max-height:38dvh}.browserBar{gap:6px}.brUrl{min-width:160px}.shotWrap{min-height:310px}}
 @media(max-width:760px){.browserBody{padding:8px}.browserPane{border-radius:22px}.browserBar{padding:9px}.brBtn{padding:9px 10px}.browserSide{max-height:42dvh}.cmdBox{flex-direction:column}.shotWrap:before{font-size:10px;right:8px;top:8px}.brUrl{width:100%;flex-basis:100%}}
 
@@ -130,18 +131,21 @@ h1{font-size:24px;margin-top:12px;letter-spacing:-.4px}.sub{font-size:12.5px;col
         <button class="brBtn" onclick="browserAct('reload')">↻ رفرش</button>
         <button class="brBtn" onclick="browserAct('frames')">🎞️ تجدید فریم</button>
         <button class="brBtn" id="br-backend" onclick="toggleBrowserBackend()" title="Actions یا Codespace Worker">حالت: Actions</button>
+        <button class="brBtn" id="cs-start" onclick="startCodespaceWorker()" title="Codespace را بدون باز کردن VS Code Web روشن می‌کند">▶ روشن کردن Worker</button>
+        <button class="brBtn" id="cs-stop" onclick="stopCodespaceWorker()" title="Codespace انتخاب‌شده را خاموش می‌کند">⏹ خاموش</button>
         <button class="brBtn" onclick="browserAct('scroll',{dy:760})">↓ اسکرول</button>
         <button class="brBtn" onclick="browserAct('scroll',{dy:-760})">↑ بالا</button>
       </div>
       <div class="browserBody">
         <div class="browserView">
-          <div class="brInfo"><span class="brPill" id="br-title">مرورگر ریموت آماده است</span><span class="brPill" id="br-current-url">هنوز صفحه‌ای باز نشده</span><span class="brStatus" id="br-status">آماده</span></div>
+          <div class="brInfo"><span class="brPill" id="br-title">مرورگر ریموت آماده است</span><span class="brPill" id="br-current-url">هنوز صفحه‌ای باز نشده</span><span class="brPill" id="cs-pill"><span class="csDot" id="cs-dot"></span><span id="cs-text">Worker نامشخص</span></span><span class="brStatus" id="br-status">آماده</span></div>
           <div class="shotWrap" id="shotWrap"><div class="brClip" id="br-clip">در حال پخش ۲۵ فریم تازه…</div><button class="brFullBtn" id="br-full" style="display:none" onclick="toggleShotFullscreen(event)" title="بزرگ‌نمایی مرورگر">⛶ بزرگ</button><div class="browserEmpty" id="br-empty"><div class="globe">🌐</div><div>URL را وارد کن یا دستور بده؛ Chromium داخل Actions یا Codespace Worker اجرا می‌شود.</div></div><img id="br-shot" alt="Remote browser screenshot" style="display:none" onclick="browserClickShot(event)"></div>
         </div>
         <aside class="browserSide">
           <h3>دستور مرورگر</h3>
           <div class="cmdBox"><input id="br-cmd" placeholder="مثلا: روی لینک 3 کلیک کن، یا این صفحه را تحلیل کن" onkeydown="if(event.key==='Enter')browserCommand()"><button class="mini" onclick="browserCommand()">اجرا</button></div>
           <button class="mini" onclick="browserAnalyze()">تحلیل AI صفحه</button>
+          <div class="workerPanel" id="worker-panel"><strong>Low‑Data Worker</strong><br><span id="worker-detail">برای حذف مصرف سنگین VS Code Web، Codespace را از همین‌جا روشن/خاموش کن.</span><div class="workerRow"><button class="mini good" onclick="startCodespaceWorker()">روشن کردن</button><button class="mini" onclick="refreshWorkerStatus(true)">وضعیت</button><button class="mini danger" onclick="stopCodespaceWorker()">خاموش کردن</button></div></div>
           <div class="noteBox" id="br-note">برای کلیک، هم می‌توانی روی عکس بزنی هم از لیست عناصر پایین استفاده کنی.</div>
           <div class="analysisBox" id="br-analysis" style="display:none"></div>
           <h3>لینک‌ها و دکمه‌های قابل کلیک</h3>
@@ -153,9 +157,10 @@ h1{font-size:24px;margin-top:12px;letter-spacing:-.4px}.sub{font-size:12.5px;col
 </div>
 
 <script>
-const CK='aip_cfg_v1', SK='aip_sessions_v1', AK='aip_active_v1', BK='aip_browser_v1', BBK='aip_browser_backend_v1';
+const CK='aip_cfg_v1', SK='aip_sessions_v1', AK='aip_active_v1', BK='aip_browser_v1', BBK='aip_browser_backend_v1', CSK='aip_codespace_name_v1';
 let cfg={}, sessions={}, active=null, loading=false, cancelled=false, doSearch=false, useFallback=false, pendImgs=[];
 let browserMode=false, browserLoading=false, browserBackend=localStorage.getItem(BBK)||'actions', browserState={sid:'b'+uid(),last:null};
+let codespaceName=localStorage.getItem(CSK)||'', codespaceBusy=false, csStatusTimer=null;
 let brFrameTimer=null;
 let proxyWakeAt=0, proxyDefaultBranch=null;
 const GH='https://api.github.com';
@@ -227,6 +232,110 @@ async function ghApiJson(path,opts={}){
   const text=await r.text();
   return text?JSON.parse(text):{};
 }
+
+
+// ── Low-data Codespace Worker controls ──
+function codespaceHeaders(){return {'Authorization':`Bearer ${cfg.token}`,'Content-Type':'application/json','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2026-03-10'}}
+async function codespaceApi(path, opts={}){
+  const r=await safeFetch(`${GH}${path}`,Object.assign({headers:codespaceHeaders()},opts));
+  if(r.status===404)return null;
+  if(r.status===401)throw new Error('GitHub token نامعتبر است. برای مدیریت Codespaces باید token معتبر وارد شود.');
+  if(r.status===403)throw new Error('توکن اجازه مدیریت Codespaces ندارد. به PAT دسترسی Codespaces lifecycle admin و Contents read/write بده.');
+  if(!r.ok){const t=await r.text().catch(()=>'');throw new Error('Codespaces API error '+r.status+' '+t.slice(0,180))}
+  if(r.status===204)return {};
+  const text=await r.text();
+  return text?JSON.parse(text):{};
+}
+function repoFullName(){return `${cfg.user}/${cfg.repo}`.toLowerCase()}
+function codeStateText(cs){
+  const st=(cs&&String(cs.state||cs.status||'').toLowerCase())||'unknown';
+  if(/available|ready|started|running/.test(st))return 'روشن';
+  if(/shutdown|shut|stopped/.test(st))return 'خاموش';
+  if(/starting|pending|queued|creating|provision/.test(st))return 'در حال روشن شدن';
+  return cs?.state||cs?.status||'نامشخص';
+}
+function setCodeStatus(text,kind=''){
+  const dot=$('cs-dot'), txt=$('cs-text'), detail=$('worker-detail');
+  if(txt)txt.textContent=text||'Worker نامشخص';
+  if(dot){dot.className='csDot '+(kind||'')}
+  if(detail)detail.textContent=text||'برای حذف مصرف سنگین VS Code Web، Codespace را از همین‌جا روشن/خاموش کن.';
+}
+async function listRepoCodespaces(){
+  const d=await codespaceApi(`/repos/${cfg.user}/${cfg.repo}/codespaces?per_page=100`);
+  return (d&&d.codespaces)||[];
+}
+async function pickCodespace(){
+  const list=await listRepoCodespaces();
+  if(!list.length)throw new Error('برای این repo هیچ Codespace پیدا نشد. یک‌بار از GitHub برای همین repo Codespace بساز؛ بعد از این دکمه روشن/خاموش همین سایت استفاده کن.');
+  const saved=list.find(c=>c.name===codespaceName);
+  const active=list.find(c=>/available|ready|started|running|starting|creating|pending/i.test(String(c.state||c.status||'')));
+  const cs=saved||active||list[0];
+  codespaceName=cs.name; localStorage.setItem(CSK,codespaceName);
+  return cs;
+}
+async function getCodespace(name){return await codespaceApi(`/user/codespaces/${encodeURIComponent(name)}`)}
+async function readWorkerStatus(){
+  try{
+    const res=await ghGet('browser_queue/worker_status.json');
+    return res&&res.data?res.data:null;
+  }catch(e){return null}
+}
+function updateWorkerStatusFromObj(st){
+  if(!st){setCodeStatus(codespaceName?`Codespace: ${codespaceName} · منتظر heartbeat`:'Worker نامشخص','warn');return}
+  const age=Math.round((Date.now()-Number(st.ts||0)*1000)/1000);
+  const ok=Number.isFinite(age)&&age<75;
+  const text=`Worker ${ok?'زنده':'قدیمی'} · ${st.codespace||codespaceName||'codespace'} · ${age>=0?age+' ثانیه پیش':'همین الان'}`;
+  setCodeStatus(text,ok?'ok':'warn');
+}
+async function refreshWorkerStatus(manual=false){
+  if(!cfg.user||!cfg.repo||!cfg.token){if(manual)showSetup();return}
+  try{
+    const st=await readWorkerStatus();
+    updateWorkerStatusFromObj(st);
+    if(manual)setBrowserStatus(st?'وضعیت Worker دریافت شد.':'هنوز heartbeat از Worker پیدا نشد.');
+  }catch(e){if(manual)setBrowserStatus('خطا در خواندن وضعیت Worker: '+e.message)}
+}
+async function startCodespaceWorker(){
+  if(codespaceBusy)return; if(!cfg.user||!cfg.repo||!cfg.token)return showSetup();
+  codespaceBusy=true; toggleBrowser(true); browserBackend='worker'; localStorage.setItem(BBK,browserBackend); updateBrowserBackendUI(); setCodeStatus('در حال یافتن Codespace...','warn'); setBrowserStatus('در حال روشن کردن Codespace بدون باز کردن VS Code Web...');
+  try{
+    const cs=await pickCodespace();
+    setCodeStatus(`Codespace: ${cs.name} · ${codeStateText(cs)}`,'warn');
+    const st=String(cs.state||cs.status||'').toLowerCase();
+    if(!/available|ready|started|running/.test(st)){
+      await codespaceApi(`/user/codespaces/${encodeURIComponent(cs.name)}/start`,{method:'POST'});
+      setCodeStatus(`Codespace: ${cs.name} · در حال روشن شدن`,'warn');
+    }
+    for(let i=0;i<36;i++){
+      await sleep(5000);
+      const now=await getCodespace(cs.name).catch(()=>null);
+      if(now) setCodeStatus(`Codespace: ${cs.name} · ${codeStateText(now)}`,/available|ready|started|running/i.test(String(now.state||now.status||''))?'ok':'warn');
+      const ws=await readWorkerStatus();
+      if(ws&&Date.now()-Number(ws.ts||0)*1000<90000){updateWorkerStatusFromObj(ws);setBrowserStatus('Worker آماده است؛ حالا URL بده یا روی صفحه کلیک کن.');return}
+      setBrowserStatus(`منتظر auto-start شدن Worker... ${i+1}`);
+    }
+    setBrowserStatus('Codespace روشن شد، ولی heartbeat Worker نرسید. CHAT_QUEUE_KEY را به Codespaces Secret اضافه کرده‌ای؟');
+    setCodeStatus(`Codespace: ${cs.name} · بدون heartbeat`,'warn');
+  }catch(e){setBrowserStatus('خطا: '+e.message); setCodeStatus('خطا در روشن کردن Worker','bad')}
+  finally{codespaceBusy=false;updateBrowserBackendUI()}
+}
+async function stopCodespaceWorker(){
+  if(codespaceBusy)return; if(!cfg.user||!cfg.repo||!cfg.token)return showSetup();
+  codespaceBusy=true; setBrowserStatus('در حال خاموش کردن Codespace...');
+  try{
+    let name=codespaceName;
+    if(!name){const cs=await pickCodespace(); name=cs.name}
+    await codespaceApi(`/user/codespaces/${encodeURIComponent(name)}/stop`,{method:'POST'});
+    setCodeStatus(`Codespace: ${name} · دستور خاموشی ارسال شد`,'bad');
+    setBrowserStatus('دستور Stop ارسال شد؛ پردازش‌های داخل Codespace متوقف می‌شوند.');
+  }catch(e){setBrowserStatus('خطا در خاموش کردن Codespace: '+e.message)}
+  finally{codespaceBusy=false;updateBrowserBackendUI()}
+}
+function startWorkerStatusTimer(){
+  if(csStatusTimer)clearInterval(csStatusTimer);
+  csStatusTimer=setInterval(()=>{if(browserMode&&browserBackend==='worker')refreshWorkerStatus(false)},30000);
+}
+
 async function getDefaultBranch(){
   if(proxyDefaultBranch)return proxyDefaultBranch;
   const repo=await ghApiJson(`/repos/${cfg.user}/${cfg.repo}`);
@@ -470,8 +579,8 @@ async function pollResponse(id,opts={}){
 // ── Remote Browser mode ──
 function saveBrowserState(){try{localStorage.setItem(BK,JSON.stringify({sid:browserState.sid,last:browserState.last}))}catch(e){}}
 function updateBrowserBackendUI(){const b=$('br-backend');if(!b)return;const worker=browserBackend==='worker';b.classList.toggle('on',worker);b.textContent=worker?'حالت: Worker':'حالت: Actions';b.title=worker?'درخواست‌های مرورگر از browser_queue خوانده می‌شوند؛ codespace_worker.py باید روشن باشد.':'درخواست‌ها با GitHub Actions اجرا می‌شوند.'}
-function toggleBrowserBackend(){browserBackend=browserBackend==='worker'?'actions':'worker';localStorage.setItem(BBK,browserBackend);updateBrowserBackendUI();setBrowserStatus(browserBackend==='worker'?'حالت Worker فعال شد؛ codespace_worker.py را در Codespace اجرا کن.':'حالت Actions فعال شد.');}
-function toggleBrowser(force){browserMode=typeof force==='boolean'?force:!browserMode;$('browserBtn').classList.toggle('on',browserMode);$('browserBtn').textContent=browserMode?'💬 چت':'🌐 مرورگر';$('chatPane').classList.toggle('hidden',browserMode);$('browserPane').classList.toggle('hidden',!browserMode);updateBrowserBackendUI()}
+function toggleBrowserBackend(){browserBackend=browserBackend==='worker'?'actions':'worker';localStorage.setItem(BBK,browserBackend);updateBrowserBackendUI();setBrowserStatus(browserBackend==='worker'?'حالت Worker فعال شد؛ اگر خاموش است، دکمه روشن کردن Worker را بزن.':'حالت Actions فعال شد.');}
+function toggleBrowser(force){browserMode=typeof force==='boolean'?force:!browserMode;$('browserBtn').classList.toggle('on',browserMode);$('browserBtn').textContent=browserMode?'💬 چت':'🌐 مرورگر';$('chatPane').classList.toggle('hidden',browserMode);$('browserPane').classList.toggle('hidden',!browserMode);updateBrowserBackendUI();startWorkerStatusTimer();if(browserMode&&browserBackend==='worker')refreshWorkerStatus(false)}
 function setBrowserLoading(v){browserLoading=v;$('br-status').textContent=v?(browserBackend==='worker'?'در حال اجرای مرورگر در Codespace Worker...':'در حال اجرای مرورگر در Actions...'):'آماده';if(v){const bc=$('br-clip');bc.classList.remove('on')}Array.from(document.querySelectorAll('.brBtn,.browserSide .mini')).forEach(b=>b.disabled=v)}
 function setBrowserStatus(s){$('br-status').textContent=s}
 async function browserAct(action,extra={}){
@@ -482,7 +591,9 @@ async function browserAct(action,extra={}){
     const payload=Object.assign({id,type:'browser',browser_session:browserState.sid,action,provider,model,backend:browserBackend},extra||{});
     const envelope=await encryptObj(payload); await ghPut(`${queueDir}/prompt_${id}.json`,envelope,null);
     if(browserBackend==='worker'){
-      setBrowserStatus('منتظر Codespace Worker...');
+      const ws=await readWorkerStatus();
+      if(!ws||Date.now()-Number(ws.ts||0)*1000>120000){setBrowserStatus('Worker heartbeat تازه نیست؛ اگر پاسخ نیامد دکمه روشن کردن Worker را بزن.')}
+      else setBrowserStatus('منتظر Codespace Worker...');
     }else{
       setBrowserStatus('در حال روشن کردن Action...');
       await wakeProxyLoop();
@@ -528,6 +639,8 @@ function renderBrowser(b){
 }
 
 updateBrowserBackendUI();
+startWorkerStatusTimer();
+refreshWorkerStatus(false);
 init();
 </script>
 </body>
