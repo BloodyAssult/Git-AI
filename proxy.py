@@ -724,11 +724,47 @@ def _safe_wait(page) -> None:
         pass
 
 
-def _state_payload(sess: Dict[str, Any], note: str = "", analysis: str = "") -> Dict[str, Any]:
-    page = sess["page"]
+
+def _capture_browser_jpeg(page, quality: int = 88) -> str:
+    # High-quality viewport screenshot. JPEG keeps queue files smaller than PNG while quality=88 is visually clear.
+    shot = page.screenshot(type="jpeg", quality=quality, full_page=False)
+    return "data:image/jpeg;base64," + base64.b64encode(shot).decode("ascii")
+
+
+def _capture_transition_frames(page, count: int = 6, delay_ms: int = 260, quality: int = 88) -> List[str]:
+    """Capture a short, high-quality 'live-ish' clip after an action.
+
+    It is intentionally a finite clip, not an endless stream, to avoid abusing GitHub
+    Actions/API limits. The last frame is captured after a final settle attempt and
+    should be used as the stable browser screenshot.
+    """
+    frames: List[str] = []
+    for i in range(max(1, count - 1)):
+        try:
+            frames.append(_capture_browser_jpeg(page, quality=quality))
+        except Exception as e:
+            print(f"frame capture {i} failed: {e}")
+        try:
+            page.wait_for_timeout(delay_ms)
+        except Exception:
+            pass
     _safe_wait(page)
-    shot = page.screenshot(type="jpeg", quality=72, full_page=False)
-    b64 = base64.b64encode(shot).decode("ascii")
+    try:
+        final_frame = _capture_browser_jpeg(page, quality=quality)
+        frames.append(final_frame)
+    except Exception as e:
+        print(f"final frame capture failed: {e}")
+    # Keep response size sane. If something odd happens, cap it.
+    return frames[-count:]
+
+def _state_payload(sess: Dict[str, Any], note: str = "", analysis: str = "", animate: bool = True) -> Dict[str, Any]:
+    page = sess["page"]
+    frames = _capture_transition_frames(page) if animate else []
+    if frames:
+        screenshot = frames[-1]
+    else:
+        _safe_wait(page)
+        screenshot = _capture_browser_jpeg(page, quality=88)
     title = ""
     url = ""
     try:
@@ -748,7 +784,8 @@ def _state_payload(sess: Dict[str, Any], note: str = "", analysis: str = "") -> 
             "title": title,
             "note": note,
             "analysis": analysis,
-            "screenshot": "data:image/jpeg;base64," + b64,
+            "screenshot": screenshot,
+            "frames": frames,
             "elements": elements,
             "text_preview": text,
             "ts": int(time.time()),
@@ -783,7 +820,6 @@ def _extract_number(text: str) -> Optional[int]:
 
 def _click_element(page, e: Dict[str, Any]) -> str:
     page.mouse.click(int(e.get("cx", 0)), int(e.get("cy", 0)))
-    _safe_wait(page)
     label = e.get("text") or e.get("href") or e.get("tag") or "element"
     return f"کلیک شد: {label[:80]}"
 

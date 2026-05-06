@@ -4,6 +4,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>AI Proxy Chat</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#050816;--bg2:#071a2f;--glass:rgba(255,255,255,.074);--glass2:rgba(255,255,255,.105);--panel:rgba(8,12,31,.60);--panel2:rgba(15,30,58,.66);--line:rgba(255,255,255,.14);--line2:rgba(34,211,238,.34);--text:#f7fbff;--muted:#b8c7df;--muted2:#7e8aa6;--accent:#6366f1;--accent2:#22d3ee;--accent3:#14b8a6;--blue:#38bdf8;--green:#34d399;--red:#fb7185;--amber:#fbbf24;--shadow:0 26px 90px rgba(0,0,0,.45);--r:22px}
@@ -129,7 +133,7 @@ h1{font-size:24px;margin-top:12px;letter-spacing:-.4px}.sub{font-size:12.5px;col
       <div class="browserBody">
         <div class="browserView">
           <div class="brInfo"><span class="brPill" id="br-title">مرورگر ریموت آماده است</span><span class="brPill" id="br-current-url">هنوز صفحه‌ای باز نشده</span><span class="brStatus" id="br-status">آماده</span></div>
-          <div class="shotWrap" id="shotWrap"><div class="browserEmpty" id="br-empty"><div class="globe">🌐</div><div>URL را وارد کن یا دستور بده؛ Chromium داخل GitHub Actions اجرا می‌شود.</div></div><img id="br-shot" alt="Remote browser screenshot" style="display:none" onclick="browserClickShot(event)"></div>
+          <div class="shotWrap" id="shotWrap"><div class="brClip" id="br-clip">در حال پخش ویدیوی کوتاه…</div><div class="browserEmpty" id="br-empty"><div class="globe">🌐</div><div>URL را وارد کن یا دستور بده؛ Chromium داخل GitHub Actions اجرا می‌شود.</div></div><img id="br-shot" alt="Remote browser screenshot" style="display:none" onclick="browserClickShot(event)"></div>
         </div>
         <aside class="browserSide">
           <h3>دستور مرورگر</h3>
@@ -149,7 +153,9 @@ h1{font-size:24px;margin-top:12px;letter-spacing:-.4px}.sub{font-size:12.5px;col
 const CK='aip_cfg_v1', SK='aip_sessions_v1', AK='aip_active_v1', BK='aip_browser_v1';
 let cfg={}, sessions={}, active=null, loading=false, cancelled=false, doSearch=false, useFallback=false, pendImgs=[];
 let browserMode=false, browserLoading=false, browserState={sid:'b'+uid(),last:null};
+let brFrameTimer=null;
 const GH='https://api.github.com';
+if(window.marked){marked.setOptions({gfm:true,breaks:true,mangle:false,headerIds:false});}
 
 function $(id){return document.getElementById(id)}
 function esc(s){return String(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
@@ -224,13 +230,87 @@ function loadSession(id){active=id;localStorage.setItem(AK,id);renderMessages();
 function deleteSession(id,e){e.stopPropagation();if(Object.keys(sessions).length<=1)return alert('آخرین چت را نمی‌شود پاک کرد');delete sessions[id];saveSessions();if(active===id)loadSession(Object.keys(sessions)[0]);renderSessions()}
 function renderSessions(){const el=$('sessions');const ids=Object.keys(sessions).sort((a,b)=>(sessions[b].updated||sessions[b].created)-(sessions[a].updated||sessions[a].created));el.innerHTML=ids.map(id=>{const s=sessions[id],d=new Date(s.updated||s.created);return `<div class="si ${id===active?'on':''}" onclick="loadSession('${id}')"><button class="del" onclick="deleteSession('${id}',event)">×</button><div class="t">${esc(s.title)}</div><div class="d">${d.toLocaleString('fa-IR')}</div></div>`}).join('')||'<div class="hint">چتی نداری</div>'}
 function renderMessages(){const el=$('msgs');const s=sessions[active];el.innerHTML='';if(!s||!s.history.length){el.innerHTML='<div class="empty"><div class="big">✦</div><h2>AI Proxy آماده است</h2><p>اول workflow را در Actions اجرا کن، بعد پیام بده.</p></div>';return}s.history.forEach(m=>addMsg(m.role,m.text,m.imgs,m.meta,false));el.scrollTop=el.scrollHeight}
+function normalizeMathText(src){
+  let t=String(src||'');
+  t=t.replace(/\\\[/g,'\\[').replace(/\\\]/g,'\\]');
+  const lines=t.split('\n');
+  const out=[];
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i];
+    const trimmed=line.trim();
+    const next=(lines[i+1]||'').trim();
+    const prev=(out[out.length-1]||'').trim();
+    if(/^\\(text|frac|sqrt|sum|int|begin|left|right|mathrm|mathbf|operatorname)\b/.test(trimmed) && next==='\\]' && prev!=='\\['){out.push('\\[')}
+    out.push(line);
+  }
+  return out.join('\n');
+}
+function fallbackMathHtmlFromSafe(safe){
+  let out=safe;
+  out=out.replace(/\\\[([\s\S]*?)\\\]/g,(m,a)=>`<div class="math-fallback">${a.trim()}</div>`);
+  out=out.replace(/\$\$([\s\S]*?)\$\$/g,(m,a)=>`<div class="math-fallback">${a.trim()}</div>`);
+  out=out.replace(/\\\(([\s\S]*?)\\\)/g,(m,a)=>`<span class="math-inline-fallback">${a.trim()}</span>`);
+  return out;
+}
+function enhanceMath(node){
+  if(!node)return;
+  if(window.renderMathInElement){
+    try{renderMathInElement(node,{throwOnError:false,strict:false,delimiters:[
+      {left:'$$',right:'$$',display:true},{left:'\\[',right:'\\]',display:true},
+      {left:'\\(',right:'\\)',display:false},{left:'$',right:'$',display:false}
+    ]});return}catch(e){console.warn('KaTeX render failed',e)}
+  }
+  node.innerHTML=fallbackMathHtmlFromSafe(node.innerHTML);
+}
+function inlineMd(s){
+  return s.replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').replace(/\*([^*]+)\*/g,'<em>$1</em>');
+}
+function simpleMarkdownHtml(safe){
+  const chunks=safe.split(/```/); let html='';
+  for(let c=0;c<chunks.length;c++){
+    const chunk=chunks[c];
+    if(c%2===1){html+=`<pre><code>${chunk.replace(/^\w+\n/,'').trim()}</code></pre>`;continue}
+    const lines=chunk.split('\n');
+    for(let i=0;i<lines.length;i++){
+      const line=lines[i];
+      if(!line.trim()){continue}
+      if(line.includes('|') && i+1<lines.length && /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(lines[i+1])){
+        const rows=[]; rows.push(line); i+=2;
+        while(i<lines.length && lines[i].includes('|') && lines[i].trim()){rows.push(lines[i]);i++}
+        i--;
+        const cells=r=>r.trim().replace(/^\||\|$/g,'').split('|').map(x=>inlineMd(fallbackMathHtmlFromSafe(x.trim())));
+        const head=cells(rows[0]);
+        html+='<table><thead><tr>'+head.map(x=>`<th>${x}</th>`).join('')+'</tr></thead><tbody>';
+        for(const r of rows.slice(1)){html+='<tr>'+cells(r).map(x=>`<td>${x}</td>`).join('')+'</tr>'}
+        html+='</tbody></table>'; continue;
+      }
+      if(/^#{1,3}\s+/.test(line)){const lvl=(line.match(/^#+/)||[''])[0].length;html+=`<h${lvl}>${inlineMd(fallbackMathHtmlFromSafe(line.replace(/^#{1,3}\s+/,'')))}</h${lvl}>`;continue}
+      if(/^[-*]\s+/.test(line)){
+        html+='<ul>'; while(i<lines.length && /^[-*]\s+/.test(lines[i])){html+=`<li>${inlineMd(fallbackMathHtmlFromSafe(lines[i].replace(/^[-*]\s+/,'')))}</li>`;i++} i--; html+='</ul>'; continue;
+      }
+      html+=`<p>${inlineMd(fallbackMathHtmlFromSafe(line))}</p>`;
+    }
+  }
+  return html;
+}
+function renderRichText(text){
+  const normalized=normalizeMathText(text||'');
+  const safe=esc(normalized);
+  if(window.marked){
+    try{return marked.parse(safe)}catch(e){}
+  }
+  return simpleMarkdownHtml(safe);
+}
 function addMsg(role,text,imgs=[],meta=null,save=true){
   const el=$('msgs');const empty=el.querySelector('.empty');if(empty)empty.remove();
   const div=document.createElement('div');div.className='msg '+(role==='user'?'user':'model');
   const imgHtml=imgs&&imgs.length?`<div class="imgs">${imgs.map(src=>`<img src="${src}">`).join('')}</div>`:'';
   const metaHtml=meta?`<div class="meta">${esc(meta.provider||'')}/${esc(meta.model||'')}${meta.requested_model&&meta.requested_model!==meta.model?' · requested: '+esc(meta.requested_model):''}</div>`:'';
-  div.innerHTML=`<div class="av">${role==='user'?'تو':'AI'}</div><div class="bubble">${imgHtml}${esc(text||'')}${metaHtml}</div>`;
-  el.appendChild(div);el.scrollTop=el.scrollHeight;
+  const body=role==='model'?`<div class="md">${renderRichText(text||'')}</div>`:`<div class="plain">${esc(text||'')}</div>`;
+  div.innerHTML=`<div class="av">${role==='user'?'تو':'AI'}</div><div class="bubble">${imgHtml}${body}${metaHtml}</div>`;
+  el.appendChild(div);
+  if(role==='model')enhanceMath(div.querySelector('.md'));
+  el.scrollTop=el.scrollHeight;
 }
 
 // ── image input ──
@@ -317,12 +397,25 @@ function browserAnalyze(){const command=$('br-cmd').value.trim()||'این صفح
 function browserClickIndex(i){browserAct('click_index',{index:i})}
 function browserTypeIndex(i){const text=window.prompt('متنی که باید وارد شود:'); if(text!==null&&text!=='')browserAct('type_index',{index:i,text})}
 function browserClickShot(ev){if(browserLoading)return; const img=$('br-shot'); if(!img.src)return; const r=img.getBoundingClientRect(); const x=Math.round((ev.clientX-r.left)*(img.naturalWidth/r.width)); const y=Math.round((ev.clientY-r.top)*(img.naturalHeight/r.height)); browserAct('click_xy',{x,y})}
+function playBrowserFrames(frames, finalSrc){
+  const img=$('br-shot'), badge=$('br-clip');
+  if(brFrameTimer){clearInterval(brFrameTimer);brFrameTimer=null}
+  const list=(frames||[]).filter(Boolean);
+  if(!list.length){img.src=finalSrc||'';return}
+  let i=0; badge.classList.add('on'); img.src=list[0];
+  brFrameTimer=setInterval(()=>{
+    i++;
+    if(i<list.length){img.src=list[i];return}
+    clearInterval(brFrameTimer);brFrameTimer=null;img.src=finalSrc||list[list.length-1]||'';badge.classList.remove('on');
+  },260);
+}
 function renderBrowser(b){
   browserState.last=b; saveBrowserState();
-  $('br-empty').style.display='none'; const img=$('br-shot'); img.style.display='block'; img.src=b.screenshot||'';
+  $('br-empty').style.display='none'; const img=$('br-shot'); img.style.display='block';
+  playBrowserFrames(b.frames||[], b.screenshot||'');
   $('br-title').textContent=b.title||'بدون عنوان'; $('br-current-url').textContent=b.url||''; if(b.url)$('br-url').value=b.url;
   $('br-note').textContent=b.note||'وضعیت صفحه دریافت شد.';
-  if(b.analysis){$('br-analysis').style.display='block';$('br-analysis').textContent=b.analysis}else{$('br-analysis').style.display='none';$('br-analysis').textContent=''}
+  if(b.analysis){$('br-analysis').style.display='block';$('br-analysis').innerHTML=`<div class="md">${renderRichText(b.analysis)}</div>`;enhanceMath($('br-analysis').querySelector('.md'))}else{$('br-analysis').style.display='none';$('br-analysis').textContent=''}
   const els=(b.elements||[]).slice(0,60);
   $('br-elems').innerHTML=els.length?els.map(e=>`<div class="elem"><div class="elemTop"><div class="num">${e.index}</div><div class="elemText"><strong>${esc(e.tag||'el')}</strong> · ${esc(e.text||e.href||'بدون متن')} ${e.href?`<br><span class="hint">${esc(e.href)}</span>`:''}</div></div><div class="elemActions"><button class="mini" onclick="browserClickIndex(${e.index})">کلیک</button>${['input','textarea','select'].includes(e.tag)||e.type?`<button class="mini" onclick="browserTypeIndex(${e.index})">تایپ</button>`:''}</div></div>`).join(''):'<div class="hint">عنصر قابل کلیک در viewport فعلی پیدا نشد. اسکرول یا رفرش کن.</div>';
 }
