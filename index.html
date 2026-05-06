@@ -139,7 +139,7 @@ h1{font-size:24px;margin-top:12px;letter-spacing:-.4px}.sub{font-size:12.5px;col
       <div class="browserBody">
         <div class="browserView">
           <div class="brInfo"><span class="brPill" id="br-title">مرورگر ریموت آماده است</span><span class="brPill" id="br-current-url">هنوز صفحه‌ای باز نشده</span><span class="brPill" id="cs-pill"><span class="csDot" id="cs-dot"></span><span id="cs-text">Worker نامشخص</span></span><span class="brStatus" id="br-status">آماده</span></div>
-          <div class="shotWrap" id="shotWrap"><div class="brClip" id="br-clip">در حال پخش ۲۵ فریم تازه…</div><button class="brFullBtn" id="br-full" style="display:none" onclick="toggleShotFullscreen(event)" title="بزرگ‌نمایی مرورگر">⛶ بزرگ</button><div class="browserEmpty" id="br-empty"><div class="globe">🌐</div><div>URL را وارد کن یا دستور بده؛ Chromium داخل Actions یا Codespace Worker اجرا می‌شود.</div></div><img id="br-shot" alt="Remote browser screenshot" style="display:none" onclick="browserClickShot(event)"></div>
+          <div class="shotWrap" id="shotWrap"><div class="brClip" id="br-clip">در حال آماده‌سازی فریم‌ها…</div><button class="brFullBtn" id="br-full" style="display:none" onclick="toggleShotFullscreen(event)" title="بزرگ‌نمایی مرورگر">⛶ بزرگ</button><div class="browserEmpty" id="br-empty"><div class="globe">🌐</div><div>URL را وارد کن یا دستور بده؛ Chromium داخل Actions یا Codespace Worker اجرا می‌شود.</div></div><img id="br-shot" alt="Remote browser screenshot" style="display:none" onclick="browserClickShot(event)"></div>
         </div>
         <aside class="browserSide">
           <h3>دستور مرورگر</h3>
@@ -761,17 +761,37 @@ function playBrowserFrames(frames, finalSrc){
   badge.classList.remove('on');
   const list=(frames||[]).filter(Boolean);
   if(!list.length){if(finalSrc)img.src=finalSrc;return}
-  let i=0; badge.classList.add('on'); img.src=list[0];
+  let i=0; badge.textContent=`در حال پخش ${list.length} فریم تازه…`; badge.classList.add('on'); img.src=list[0];
   brFrameTimer=setInterval(()=>{
     i++;
     if(i<list.length){img.src=list[i];return}
     clearInterval(brFrameTimer);brFrameTimer=null;img.src=finalSrc||list[list.length-1]||'';badge.classList.remove('on');
-  },55);
+  },50);
+}
+async function loadBrowserFrames(path, finalSrc, expected){
+  const badge=$('br-clip');
+  if(!path)return;
+  try{
+    badge.textContent=`در حال بارگذاری ${expected||25} فریم…`;
+    badge.classList.add('on');
+    const res=await ghGet(path);
+    if(!res||!res.data)throw new Error('فایل فریم پیدا نشد');
+    const obj=await decryptObj(res.data);
+    const frames=(obj&&obj.frames)||[];
+    try{await ghDel(path,res.sha)}catch(e){}
+    if(frames.length){playBrowserFrames(frames,finalSrc);setBrowserStatus(`فریم‌ها آماده شدند: ${frames.length}`)}
+    else {badge.classList.remove('on');setBrowserStatus('فریم جداگانه خالی بود؛ تصویر نهایی نمایش داده شد.')}
+  }catch(e){
+    badge.classList.remove('on');
+    const msg=((e&&e.message)||String(e)).slice(0,120);
+    setBrowserStatus('تصویر نهایی آمد؛ بارگذاری فریم‌ها ناموفق بود: '+msg);
+  }
 }
 function renderBrowser(b){
   browserState.last=b; saveBrowserState();
   $('br-empty').style.display='none'; const img=$('br-shot'); img.style.display='block'; const fb=$('br-full'); if(fb)fb.style.display='block';
   playBrowserFrames(b.frames||[], b.screenshot||'');
+  if(b.frames_path){loadBrowserFrames(b.frames_path,b.screenshot||'',b.frames_count||25)}
   $('br-title').textContent=b.title||'بدون عنوان'; $('br-current-url').textContent=b.url||''; if(b.url)$('br-url').value=b.url;
   $('br-note').textContent=b.note||'وضعیت صفحه دریافت شد.';
   if(b.analysis){$('br-analysis').style.display='block';$('br-analysis').innerHTML=`<div class="md">${renderRichText(b.analysis)}</div>`;enhanceMath($('br-analysis').querySelector('.md'))}else{$('br-analysis').style.display='none';$('br-analysis').textContent=''}

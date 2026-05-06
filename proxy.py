@@ -1,5 +1,6 @@
 import base64
 import json
+import io
 import os
 import re
 import time
@@ -38,6 +39,8 @@ GH_HEADERS = {
 
 POLL_SECONDS = 3
 REQUEST_TIMEOUT = 120
+BROWSER_FRAME_COUNT = int(os.environ.get("BROWSER_FRAME_COUNT", "25"))
+BROWSER_FRAME_FILE_MAX_CHARS = int(os.environ.get("BROWSER_FRAME_FILE_MAX_CHARS", "36000000"))
 
 # ─────────────────────────────────────────────────────────────────────────────
 # GitHub content helpers
@@ -770,6 +773,46 @@ def _capture_browser_jpeg(page, quality: int = 94, max_chars: int = 1_200_000) -
     return _jpeg_data_url(last)
 
 
+def _webp_data_url(raw: bytes, quality: int = 84) -> Optional[str]:
+    """Encode a screenshot frame as WebP when Pillow is available.
+
+    This keeps the visual quality high while shrinking transition frames enough for
+    GitHub API relay. The final stable screenshot still remains high-quality JPEG.
+    """
+    try:
+        from PIL import Image
+        img = Image.open(io.BytesIO(raw)).convert("RGB")
+        out = io.BytesIO()
+        img.save(out, format="WEBP", quality=int(quality), method=4)
+        return "data:image/webp;base64," + base64.b64encode(out.getvalue()).decode("ascii")
+    except Exception as e:
+        print(f"webp encode unavailable: {e}")
+        return None
+
+
+def _frame_data_url(raw: bytes, webp_quality: int = 84, jpeg_quality_hint: int = 90, max_chars: int = 900_000) -> str:
+    # Prefer WebP for animation frames. Chrome/Android supports it, and it usually
+    # gives far more frames at the same perceived quality than JPEG over the repo relay.
+    webp = _webp_data_url(raw, quality=webp_quality)
+    if webp and (not max_chars or len(webp) <= max_chars):
+        return webp
+    if webp:
+        # Try slightly lower WebP qualities before falling back to JPEG. This affects
+        # transition frames only, not the final screenshot.
+        for q in (82, 80, 78, 76):
+            webp = _webp_data_url(raw, quality=q)
+            if webp and (not max_chars or len(webp) <= max_chars):
+                return webp
+    return _jpeg_data_url(raw)
+
+
+def _capture_browser_frame(page, quality: int = 92, max_chars: int = 900_000) -> str:
+    # Capture once at high JPEG quality, then transcode the animation frame to WebP
+    # to keep the relay light without losing the final screenshot quality.
+    shot = page.screenshot(type="jpeg", quality=max(88, int(quality)), full_page=False)
+    return _frame_data_url(shot, webp_quality=84, jpeg_quality_hint=quality, max_chars=max_chars)
+
+
 def _data_url_chars(items: List[str]) -> int:
     return sum(len(x or "") for x in items)
 
@@ -795,7 +838,7 @@ def _evenly_sample(items: List[str], keep: int) -> List[str]:
     return out[:keep]
 
 
-def _trim_frames_for_queue(frames: List[str], final_shot: str, max_chars: int = 18_500_000) -> List[str]:
+def _trim_frames_for_queue(frames: List[str], final_shot: str, max_chars: int = BROWSER_FRAME_FILE_MAX_CHARS) -> List[str]:
     """Keep the clip small enough for GitHub polling while preserving motion and image quality.
 
     The stable final screenshot is sent separately, so transition frames intentionally
@@ -803,13 +846,13 @@ def _trim_frames_for_queue(frames: List[str], final_shot: str, max_chars: int = 
     visually too heavy, we down-sample evenly instead of reducing JPEG quality first.
     """
     frames = [f for f in frames if f and f != final_shot]
-    if _data_url_chars(frames + [final_shot]) <= max_chars:
+    if _data_url_chars(frames) <= max_chars:
         return frames
     for keep in (24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 3, 2, 1):
         if len(frames) < keep:
             continue
         candidate = _evenly_sample(frames, keep)
-        if _data_url_chars(candidate + [final_shot]) <= max_chars:
+        if _data_url_chars(candidate) <= max_chars:
             return candidate
     return []
 
@@ -830,7 +873,7 @@ def _capture_screencast_frames(page, count: int = 25, duration_ms: int = 760, qu
         try:
             data = frame.get("data") if isinstance(frame, dict) else None
             if data:
-                frames.append(_jpeg_data_url(data))
+                frames.append(_frame_data_url(data, webp_quality=84, max_chars=900_000))
         except Exception as e:
             print(f"screencast frame failed: {e}")
 
@@ -851,14 +894,14 @@ def _capture_screencast_frames(page, count: int = 25, duration_ms: int = 760, qu
     return _evenly_sample(frames, count)
 
 
-def _capture_transition_frames(page, count: int = 25, delay_ms: int = 28, quality: int = 92) -> List[str]:
+def _capture_transition_frames(page, count: int = BROWSER_FRAME_COUNT, delay_ms: int = 22, quality: int = 92) -> List[str]:
     """Capture a short, high-quality 'live-ish' clip after an action.
 
     First tries Playwright native screencast for speed. Fallback is a faster screenshot
     burst with the same JPEG quality target. The last frame should be used as the stable
     browser screenshot.
     """
-    frames = _capture_screencast_frames(page, count=count, duration_ms=760, quality=quality)
+    frames = _capture_screencast_frames(page, count=count, duration_ms=900, quality=quality)
     if frames:
         try:
             final_frame = _capture_browser_jpeg(page, quality=96, max_chars=2_400_000)
@@ -870,7 +913,7 @@ def _capture_transition_frames(page, count: int = 25, delay_ms: int = 28, qualit
     frames = []
     for i in range(max(1, count - 1)):
         try:
-            frames.append(_capture_browser_jpeg(page, quality=quality, max_chars=950_000))
+            frames.append(_capture_browser_frame(page, quality=quality, max_chars=900_000))
         except Exception as e:
             print(f"frame capture {i} failed: {e}")
         try:
@@ -920,7 +963,9 @@ def _state_payload(sess: Dict[str, Any], note: str = "", analysis: str = "", ani
             "text_preview": text,
             "ts": int(time.time()),
             "device_scale_factor": 1.5,
-            "frame_profile": "hq-25frames-fast-screencast",
+            "frame_profile": "hq-25frames-webp-split",
+            "frames_path": "",
+            "frames_count": len(frames),
         },
         "meta": {"provider": "github-actions", "model": "playwright/chromium", "requested_model": "browser-agent"},
     }

@@ -101,14 +101,88 @@ def id_from_prompt_path(path: str) -> str:
     return m.group(1) if m else "unknown"
 
 
-def write_response(req_id: str, result: Any) -> None:
-    """Write the response, with progressively smaller fallbacks.
+def _evenly_sample(items: List[str], keep: int) -> List[str]:
+    if keep <= 0:
+        return []
+    if len(items) <= keep:
+        return items
+    if keep == 1:
+        return [items[len(items) // 2]]
+    idxs = sorted(set(round(i * (len(items) - 1) / (keep - 1)) for i in range(keep)))
+    out = [items[i] for i in idxs]
+    if len(out) < keep:
+        for x in reversed(items):
+            if x not in out:
+                out.append(x)
+            if len(out) >= keep:
+                break
+    return out[:keep]
 
-    A big browser payload can fail to commit via Contents API. Previously that made
-    the web UI wait forever. Now every failed write degrades to a smaller payload
-    and finally to a tiny explicit error response.
+
+def _detach_browser_frames(req_id: str, result: Any) -> Any:
+    """Move animation frames to a separate encrypted file.
+
+    This makes the main browser response arrive quickly with the final screenshot, while
+    the UI loads the 25-frame clip asynchronously. If the frame file is still too big,
+    we downsample frame count evenly but keep the final screenshot untouched.
     """
+    if not isinstance(result, dict) or not isinstance(result.get("browser"), dict):
+        return result
+    b = dict(result["browser"])
+    frames = [x for x in (b.get("frames") or []) if x]
+    if not frames:
+        return result
+
+    frames_path = f"{QUEUE_DIR}/frames_{req_id}.json"
+
+    def attempt(frame_list: List[str]) -> bool:
+        payload = {
+            "kind": "browser_frames",
+            "request_id": req_id,
+            "ts": time.time(),
+            "count": len(frame_list),
+            "profile": b.get("frame_profile") or "hq-frames",
+            "frames": frame_list,
+        }
+        old_sha = proxy.get_file_sha(frames_path)
+        return proxy.put_file(frames_path, proxy.encrypt_envelope(payload), old_sha)
+
+    # Try all frames first, then degrade only frame count. The main response will never
+    # block on frames after this helper returns.
+    keep_plan = [len(frames), 25, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4]
+    tried = set()
+    for keep in keep_plan:
+        keep = min(int(keep), len(frames))
+        if keep <= 0 or keep in tried:
+            continue
+        tried.add(keep)
+        candidate = _evenly_sample(frames, keep)
+        if attempt(candidate):
+            b["frames"] = []
+            b["frames_path"] = frames_path
+            b["frames_count"] = len(candidate)
+            b["frames_note"] = f"{len(candidate)} فریم جداگانه ذخیره شد و بعد از نمایش تصویر نهایی بارگذاری می‌شود."
+            lean = dict(result)
+            lean["browser"] = b
+            write_worker_log("info", "frames detached", {"request_id": req_id, "frames": len(candidate), "path": frames_path})
+            return lean
+
+    b["frames"] = []
+    b["frames_path"] = ""
+    b["frames_count"] = 0
+    b["note"] = (b.get("note") or "") + "\nفریم‌ها به‌خاطر حجم زیاد ذخیره نشدند؛ تصویر نهایی ارسال شد."
+    lean = dict(result)
+    lean["browser"] = b
+    write_worker_log("warn", "frames dropped; too large to store", {"request_id": req_id, "original_frames": len(frames)})
+    return lean
+
+
+def write_response(req_id: str, result: Any) -> None:
+    """Write the response, with progressively smaller fallbacks."""
     resp_path = f"{QUEUE_DIR}/response_{req_id}.json"
+
+    # Important: keep the main response small so the web UI does not wait forever.
+    result = _detach_browser_frames(req_id, result)
 
     def attempt(obj: Any) -> bool:
         old_sha = proxy.get_file_sha(resp_path)
@@ -121,6 +195,7 @@ def write_response(req_id: str, result: Any) -> None:
         lean = dict(result)
         b = dict(result["browser"])
         b["frames"] = []
+        b["frames_path"] = ""
         b["note"] = (b.get("note") or "") + "\nفریم‌های ویدیو برای کاهش حجم حذف شدند."
         lean["browser"] = b
         if attempt(lean):
