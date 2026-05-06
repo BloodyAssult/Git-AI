@@ -1,0 +1,14 @@
+{
+  "name": "Git-AI Browser Worker",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "postCreateCommand": "python -m pip install -q requests cryptography playwright && python -m playwright install --with-deps chromium && touch .worker_deps_ready",
+  "postStartCommand": "bash -lc 'mkdir -p /tmp/git-ai && (WORKER_NONINTERACTIVE=1 setsid bash scripts/start_codespace_worker.sh </dev/null >>/tmp/git-ai/worker.log 2>&1 & echo $! > /tmp/git-ai/worker.pid); sleep 1'",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python"
+      ]
+    }
+  },
+  "postAttachCommand": "bash -lc 'if ! pgrep -af codespace_worker.py >/dev/null; then (WORKER_NONINTERACTIVE=1 setsid bash scripts/start_codespace_worker.sh </dev/null >>/tmp/git-ai/worker.log 2>&1 & echo $! > /tmp/git-ai/worker.pid); fi'"
+}
