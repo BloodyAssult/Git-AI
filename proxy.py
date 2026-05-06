@@ -66,14 +66,40 @@ def get_file(path: str) -> Tuple[Optional[Any], Optional[str]]:
     r = requests.get(
         f"{BASE}/repos/{REPO}/contents/{path}?_={time.time()}",
         headers=GH_HEADERS,
-        timeout=20,
+        timeout=25,
     )
     if r.status_code == 404:
         return None, None
     r.raise_for_status()
     d = r.json()
-    content = base64.b64decode(d["content"]).decode("utf-8")
-    return json.loads(content), d["sha"]
+    content = d.get("content") or ""
+    # For larger files GitHub Contents API may omit inline content; fetch the blob.
+    if (not content or d.get("encoding") == "none") and d.get("sha"):
+        br = requests.get(
+            f"{BASE}/repos/{REPO}/git/blobs/{d['sha']}?_={time.time()}",
+            headers=GH_HEADERS,
+            timeout=35,
+        )
+        br.raise_for_status()
+        bd = br.json()
+        content = bd.get("content") or ""
+    if not content:
+        return None, d.get("sha")
+    content = base64.b64decode(content).decode("utf-8")
+    return json.loads(content), d.get("sha")
+
+
+def get_file_sha(path: str) -> Optional[str]:
+    r = requests.get(
+        f"{BASE}/repos/{REPO}/contents/{path}?_={time.time()}",
+        headers=GH_HEADERS,
+        timeout=20,
+    )
+    if r.status_code == 404:
+        return None
+    r.raise_for_status()
+    d = r.json()
+    return d.get("sha")
 
 
 def put_file(path: str, content: Any, sha: Optional[str] = None) -> bool:
@@ -84,7 +110,7 @@ def put_file(path: str, content: Any, sha: Optional[str] = None) -> bool:
         f"{BASE}/repos/{REPO}/contents/{path}",
         headers=GH_HEADERS,
         json=body,
-        timeout=25,
+        timeout=60,
     )
     if r.status_code not in (200, 201):
         print(f"put_file failed {path}: {r.status_code} {r.text[:400]}")
@@ -725,17 +751,26 @@ def _safe_wait(page) -> None:
 
 
 
-def _capture_browser_jpeg(page, quality: int = 88) -> str:
+def _capture_browser_jpeg(page, quality: int = 88, max_chars: int = 520_000) -> str:
     # High-quality viewport screenshot. JPEG keeps queue files smaller than PNG while quality remains clear.
-    shot = page.screenshot(type="jpeg", quality=quality, full_page=False)
-    return "data:image/jpeg;base64," + base64.b64encode(shot).decode("ascii")
+    # The max_chars cap prevents GitHub API fetches from hanging on very large JSON responses.
+    q = int(quality)
+    last = b""
+    while q >= 66:
+        shot = page.screenshot(type="jpeg", quality=q, full_page=False)
+        last = shot
+        data = "data:image/jpeg;base64," + base64.b64encode(shot).decode("ascii")
+        if not max_chars or len(data) <= max_chars:
+            return data
+        q -= 6
+    return "data:image/jpeg;base64," + base64.b64encode(last).decode("ascii")
 
 
 def _data_url_chars(items: List[str]) -> int:
     return sum(len(x or "") for x in items)
 
 
-def _trim_frames_for_queue(frames: List[str], final_shot: str, max_chars: int = 560_000) -> List[str]:
+def _trim_frames_for_queue(frames: List[str], final_shot: str, max_chars: int = 420_000) -> List[str]:
     """Keep the clip small enough for GitHub Contents API polling.
 
     The stable final screenshot is sent separately, so transition frames intentionally
@@ -756,7 +791,7 @@ def _trim_frames_for_queue(frames: List[str], final_shot: str, max_chars: int = 
     return []
 
 
-def _capture_transition_frames(page, count: int = 4, delay_ms: int = 220, quality: int = 84) -> List[str]:
+def _capture_transition_frames(page, count: int = 4, delay_ms: int = 220, quality: int = 86) -> List[str]:
     """Capture a short, high-quality 'live-ish' clip after an action.
 
     It is intentionally a finite clip, not an endless stream, to avoid abusing GitHub
@@ -1066,9 +1101,22 @@ def id_from_prompt_path(path: str) -> str:
 
 def write_response(req_id: str, result: Any) -> None:
     resp_path = f"queue/response_{req_id}.json"
-    _, old_sha = get_file(resp_path)
+    old_sha = get_file_sha(resp_path)
     payload = encrypt_envelope(result)
-    put_file(resp_path, payload, old_sha)
+    ok = put_file(resp_path, payload, old_sha)
+    if not ok:
+        # If the rich browser payload is too large, retry with a lean payload.
+        try:
+            if isinstance(result, dict) and isinstance(result.get("browser"), dict):
+                lean = dict(result)
+                b = dict(result["browser"])
+                b["frames"] = []
+                b["note"] = (b.get("note") or "") + "\nفریم‌های ویدیو برای کاهش حجم حذف شدند."
+                lean["browser"] = b
+                payload = encrypt_envelope(lean)
+                put_file(resp_path, payload, old_sha)
+        except Exception as e:
+            print(f"lean response retry failed: {e}")
 
 
 def process_prompt_file(path: str, sha: str) -> None:

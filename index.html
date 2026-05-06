@@ -155,6 +155,7 @@ const CK='aip_cfg_v1', SK='aip_sessions_v1', AK='aip_active_v1', BK='aip_browser
 let cfg={}, sessions={}, active=null, loading=false, cancelled=false, doSearch=false, useFallback=false, pendImgs=[];
 let browserMode=false, browserLoading=false, browserState={sid:'b'+uid(),last:null};
 let brFrameTimer=null;
+let proxyWakeAt=0, proxyDefaultBranch=null;
 const GH='https://api.github.com';
 if(window.marked){marked.setOptions({gfm:true,breaks:true,mangle:false,headerIds:false});}
 
@@ -211,8 +212,47 @@ async function safeFetch(url,opts){
   try{return await fetch(url,opts)}
   catch(e){
     const msg=(e&&e.message)||String(e||'');
-    throw new Error(msg==='Failed to fetch'?'ارتباط با GitHub API برقرار نشد. معمولاً از کندی شبکه، CORS موقت، یا بزرگ بودن فایل پاسخ است. دوباره تلاش کن؛ در این نسخه پاسخ‌های بزرگ بهتر هندل می‌شوند.':msg);
+    throw new Error(msg==='Failed to fetch'?'ارتباط با GitHub API برقرار نشد. معمولاً از کندی شبکه، CORS موقت، یا وقفه کوتاه GitHub API است. چند ثانیه دیگر خودکار دوباره تلاش می‌کنم.':msg);
   }
+}
+async function ghApiJson(path,opts={}){
+  const r=await safeFetch(`${GH}${path}`,Object.assign({headers:ghHeaders()},opts));
+  if(r.status===404)return null;
+  if(r.status===401)throw new Error('GitHub token نامعتبر است');
+  if(r.status===403)throw new Error('GitHub token دسترسی کافی ندارد یا rate limit خوردی');
+  if(!r.ok){const t=await r.text().catch(()=>'');throw new Error('GitHub API error '+r.status+' '+t.slice(0,160))}
+  if(r.status===204)return {};
+  const text=await r.text();
+  return text?JSON.parse(text):{};
+}
+async function getDefaultBranch(){
+  if(proxyDefaultBranch)return proxyDefaultBranch;
+  const repo=await ghApiJson(`/repos/${cfg.user}/${cfg.repo}`);
+  proxyDefaultBranch=(repo&&repo.default_branch)||'main';
+  return proxyDefaultBranch;
+}
+function isActiveRun(r){return r&&['queued','in_progress','requested','waiting','pending'].includes(r.status)}
+async function proxyRunStatus(){
+  const d=await ghApiJson(`/repos/${cfg.user}/${cfg.repo}/actions/workflows/ai-proxy.yml/runs?per_page=5`);
+  const runs=(d&&d.workflow_runs)||[];
+  const active=runs.find(isActiveRun);
+  const last=runs[0];
+  return {active,last,text:active?`Action فعال است: ${active.status}`:(last?`آخرین Action: ${last.status}${last.conclusion?' / '+last.conclusion:''}`:'Action پیدا نشد')};
+}
+async function wakeProxyLoop(){
+  const now=Date.now();
+  // جلوگیری از ارسال چند dispatch پشت سر هم
+  if(now-proxyWakeAt<25000)return {skipped:true};
+  proxyWakeAt=now;
+  let st=null;
+  try{st=await proxyRunStatus(); if(st.active)return {active:true,status:st.text}}catch(e){console.warn('workflow status check failed',e)}
+  const ref=await getDefaultBranch().catch(()=> 'main');
+  const r=await safeFetch(`${GH}/repos/${cfg.user}/${cfg.repo}/actions/workflows/ai-proxy.yml/dispatches`,{method:'POST',headers:ghHeaders(),body:JSON.stringify({ref})});
+  if([200,201,202,204].includes(r.status))return {started:true,status:'Action اجرا شد'};
+  const t=await r.text().catch(()=>'');
+  if(r.status===404)throw new Error('workflow پیدا نشد یا token اجازه اجرای Actions ندارد. در تنظیمات token، دسترسی workflow/actions را اضافه کن.');
+  if(r.status===401||r.status===403)throw new Error('token اجازه اجرای workflow ندارد. برای اجرای خودکار باید دسترسی Actions/Workflow و Contents write داشته باشد.');
+  throw new Error('اجرای خودکار Action ناموفق بود: '+r.status+' '+t.slice(0,160));
 }
 async function ghGet(path){
   const r=await safeFetch(`${GH}/repos/${cfg.user}/${cfg.repo}/contents/${path}?_=${Date.now()}`,{headers:ghHeaders()});
@@ -247,7 +287,7 @@ function newSession(){const id='s'+uid();const now=Date.now();sessions[id]={id,t
 function loadSession(id){active=id;localStorage.setItem(AK,id);renderMessages();renderSessions();closeSide()}
 function deleteSession(id,e){e.stopPropagation();if(Object.keys(sessions).length<=1)return alert('آخرین چت را نمی‌شود پاک کرد');delete sessions[id];saveSessions();if(active===id)loadSession(Object.keys(sessions)[0]);renderSessions()}
 function renderSessions(){const el=$('sessions');const ids=Object.keys(sessions).sort((a,b)=>(sessions[b].updated||sessions[b].created)-(sessions[a].updated||sessions[a].created));el.innerHTML=ids.map(id=>{const s=sessions[id],d=new Date(s.updated||s.created);return `<div class="si ${id===active?'on':''}" onclick="loadSession('${id}')"><button class="del" onclick="deleteSession('${id}',event)">×</button><div class="t">${esc(s.title)}</div><div class="d">${d.toLocaleString('fa-IR')}</div></div>`}).join('')||'<div class="hint">چتی نداری</div>'}
-function renderMessages(){const el=$('msgs');const s=sessions[active];el.innerHTML='';if(!s||!s.history.length){el.innerHTML='<div class="empty"><div class="big">✦</div><h2>AI Proxy آماده است</h2><p>اول workflow را در Actions اجرا کن، بعد پیام بده.</p></div>';return}s.history.forEach(m=>addMsg(m.role,m.text,m.imgs,m.meta,false));el.scrollTop=el.scrollHeight}
+function renderMessages(){const el=$('msgs');const s=sessions[active];el.innerHTML='';if(!s||!s.history.length){el.innerHTML='<div class="empty"><div class="big">✦</div><h2>AI Proxy آماده است</h2><p>پیام بده؛ اگر Action خاموش باشد خودکار روشن می‌شود.</p></div>';return}s.history.forEach(m=>addMsg(m.role,m.text,m.imgs,m.meta,false));el.scrollTop=el.scrollHeight}
 function normalizeMathText(src){
   let t=String(src||'');
   t=t.replace(/\\\[/g,'\\[').replace(/\\\]/g,'\\]');
@@ -378,17 +418,48 @@ async function sendMsg(){
     const payload={id,provider,model,use_search:doSearch,use_fallback:useFallback,make_title:isFirst,contents:history};
     const envelope=await encryptObj(payload);
     await ghPut(`queue/prompt_${id}.json`,envelope,null);
+    setStatus('در حال روشن کردن Action...');
+    await wakeProxyLoop();
     setStatus('منتظر پاسخ Actions...');
-    const out=await pollResponse(id); if(cancelled)return;
+    const out=await pollResponse(id,{timeoutMs:600000}); if(cancelled)return;
     const cand=out?.candidates?.[0]; const reply=cand?.content?.parts?.[0]?.text; if(out?.error)throw new Error(out.error.message||JSON.stringify(out.error)); if(!reply)throw new Error('پاسخ خالی بود');
     addMsg('model',reply,[],out.meta||null,true); sess.history.push({role:'model',text:reply,meta:out.meta||null}); if(isFirst){const smartTitle=out?.meta?.title||''; sess.title=smartTitle?makeTitle(smartTitle,false):makeTitle(text,imgs.length)} sess.updated=Date.now(); saveSessions(); renderSessions(); setStatus('آماده');
   }catch(e){if(!cancelled){addMsg('model','❌ '+e.message,[],null,true);setStatus('خطا')}}
   finally{if(!cancelled)setLoading(false);ta.focus()}
 }
-async function pollResponse(id){
-  const path=`queue/response_${id}.json`; const deadline=Date.now()+240000; let n=0;
-  while(Date.now()<deadline){if(cancelled)throw new Error('cancelled');await sleep(3500);setStatus('در حال بررسی پاسخ... '+(++n));const res=await ghGet(path).catch(e=>null);if(res&&res.data){const obj=await decryptObj(res.data);ghDel(path,res.sha);return obj}}
-  throw new Error('timeout؛ آیا workflow در Actions اجراست؟')
+async function pollResponse(id,opts={}){
+  const path=`queue/response_${id}.json`;
+  const deadline=Date.now()+(opts.timeoutMs||600000);
+  const isBrowser=!!opts.browser;
+  let n=0,lastErr='';
+  while(Date.now()<deadline){
+    if(cancelled)throw new Error('cancelled');
+    await sleep(opts.pollMs||3500);
+    n++;
+    const base='در حال بررسی پاسخ Actions... '+n;
+    if(isBrowser)setBrowserStatus(lastErr?base+' · '+lastErr:base); else setStatus(lastErr?base+' · '+lastErr:base);
+    try{
+      const res=await ghGet(path);
+      if(res&&res.data){const obj=await decryptObj(res.data);ghDel(path,res.sha);return obj}
+      lastErr='';
+    }catch(e){
+      lastErr=((e&&e.message)||String(e)).slice(0,90);
+      if(/token|401|403|rate limit|دسترسی/.test(lastErr))throw e;
+    }
+    // هر حدود ۲۰ ثانیه وضعیت Action را هم چک کن تا کاربر نداند گیر کرده یا واقعاً در حال اجراست.
+    if(n%6===0){
+      try{
+        const st=await proxyRunStatus();
+        const txt=st.text||'';
+        if(isBrowser)setBrowserStatus(base+' · '+txt); else setStatus(base+' · '+txt);
+        if(st.last && st.last.status==='completed' && st.last.conclusion && st.last.conclusion!=='success'){
+          lastErr='آخرین Action با خطا تمام شد: '+st.last.conclusion;
+        }
+      }catch(e){}
+    }
+    if(n===8){try{await wakeProxyLoop()}catch(e){lastErr=((e&&e.message)||String(e)).slice(0,90)}}
+  }
+  throw new Error('timeout؛ پاسخ ساخته نشد. تب Actions را چک کن؛ احتمالاً workflow اجرا نشده، خطا داده یا token دسترسی workflow ندارد.')
 }
 
 
@@ -403,7 +474,9 @@ async function browserAct(action,extra={}){
     const [provider,model]=$('model').value.split('|'); const id='br_'+uid();
     const payload=Object.assign({id,type:'browser',browser_session:browserState.sid,action,provider,model},extra||{});
     const envelope=await encryptObj(payload); await ghPut(`queue/prompt_${id}.json`,envelope,null);
-    setBrowserStatus('منتظر پاسخ Actions...'); const out=await pollResponse(id);
+    setBrowserStatus('در حال روشن کردن Action...');
+    await wakeProxyLoop();
+    setBrowserStatus('منتظر پاسخ Actions...'); const out=await pollResponse(id,{timeoutMs:720000,browser:true});
     if(out?.browser)renderBrowser(out.browser);
     if(out?.error){const msg=out.error.message||JSON.stringify(out.error);$('br-note').textContent=(out.browser?.note?out.browser.note+'\n':'')+'❌ '+msg;}
   }catch(e){$('br-note').textContent='❌ '+((e&&e.message)||e||'خطای ناشناخته');$('br-clip').classList.remove('on');setBrowserStatus('خطا')}
