@@ -502,7 +502,7 @@ function playBrowserFrames(frames, finalSrc){
     i++;
     if(i<list.length){img.src=list[i];return}
     clearInterval(brFrameTimer);brFrameTimer=null;img.src=finalSrc||list[list.length-1]||'';badge.classList.remove('on');
-  },115);
+  },80);
 }
 function renderBrowser(b){
   browserState.last=b; saveBrowserState();

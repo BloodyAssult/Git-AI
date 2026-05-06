@@ -770,18 +770,18 @@ def _data_url_chars(items: List[str]) -> int:
     return sum(len(x or "") for x in items)
 
 
-def _trim_frames_for_queue(frames: List[str], final_shot: str, max_chars: int = 7_800_000) -> List[str]:
+def _trim_frames_for_queue(frames: List[str], final_shot: str, max_chars: int = 12_800_000) -> List[str]:
     """Keep the clip small enough for GitHub polling while preserving motion.
 
     The stable final screenshot is sent separately, so transition frames intentionally
-    exclude it. With HQ mode we try to keep all 14 transition frames; if the page is
+    exclude it. With HQ 25-frame mode we try to keep all 24 transition frames; if the page is
     visually too heavy, we down-sample evenly instead of dropping directly to 1-2.
     """
     frames = [f for f in frames if f and f != final_shot]
     if _data_url_chars(frames + [final_shot]) <= max_chars:
         return frames
     # Try progressively fewer, evenly-spaced frames so motion still feels natural.
-    for keep in (12, 10, 8, 6, 4, 3, 2, 1):
+    for keep in (24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 3, 2, 1):
         if len(frames) < keep:
             continue
         if keep == 1:
@@ -794,7 +794,7 @@ def _trim_frames_for_queue(frames: List[str], final_shot: str, max_chars: int = 
     return []
 
 
-def _capture_transition_frames(page, count: int = 15, delay_ms: int = 95, quality: int = 92) -> List[str]:
+def _capture_transition_frames(page, count: int = 25, delay_ms: int = 72, quality: int = 90) -> List[str]:
     """Capture a short, high-quality 'live-ish' clip after an action.
 
     It is intentionally a finite clip, not an endless stream, to avoid abusing GitHub
@@ -804,7 +804,7 @@ def _capture_transition_frames(page, count: int = 15, delay_ms: int = 95, qualit
     frames: List[str] = []
     for i in range(max(1, count - 1)):
         try:
-            frames.append(_capture_browser_jpeg(page, quality=quality))
+            frames.append(_capture_browser_jpeg(page, quality=quality, max_chars=650_000))
         except Exception as e:
             print(f"frame capture {i} failed: {e}")
         try:
@@ -813,7 +813,7 @@ def _capture_transition_frames(page, count: int = 15, delay_ms: int = 95, qualit
             pass
     _safe_wait(page)
     try:
-        final_frame = _capture_browser_jpeg(page, quality=max(quality, 96), max_chars=1_600_000)
+        final_frame = _capture_browser_jpeg(page, quality=96, max_chars=1_800_000)
         frames.append(final_frame)
     except Exception as e:
         print(f"final frame capture failed: {e}")
@@ -855,7 +855,7 @@ def _state_payload(sess: Dict[str, Any], note: str = "", analysis: str = "", ani
             "text_preview": text,
             "ts": int(time.time()),
             "device_scale_factor": 1.5,
-            "frame_profile": "hq-15frames",
+            "frame_profile": "hq-25frames-adaptive",
         },
         "meta": {"provider": "github-actions", "model": "playwright/chromium", "requested_model": "browser-agent"},
     }
