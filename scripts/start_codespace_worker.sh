@@ -32,11 +32,19 @@ fi
 
 if [ -z "${CHAT_QUEUE_KEY:-}" ]; then
   echo "CHAT_QUEUE_KEY is not set. It must match the Security Key in the web UI and GitHub Secret."
+  if [ "${WORKER_NONINTERACTIVE:-}" = "1" ]; then
+    echo "Non-interactive auto-start: skipping worker. Add CHAT_QUEUE_KEY as a Codespaces secret, then start again from the web UI."
+    exit 3
+  fi
   read -r -s -p "CHAT_QUEUE_KEY: " CHAT_QUEUE_KEY
   echo
   export CHAT_QUEUE_KEY
 fi
 
-python -m pip install -q requests cryptography playwright
-python -m playwright install --with-deps chromium
+if [ ! -f .worker_deps_ready ]; then
+  python -m pip install -q requests cryptography playwright
+  python -m playwright install --with-deps chromium
+  touch .worker_deps_ready
+fi
+
 python codespace_worker.py
