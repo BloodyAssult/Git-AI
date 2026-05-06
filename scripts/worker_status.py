@@ -4,6 +4,7 @@ Used by start_codespace_worker.sh before Python dependencies/Playwright are read
 so the GitHub Pages UI can show the real boot/error state instead of waiting forever.
 """
 import base64
+import hashlib
 import json
 import os
 import re
@@ -89,6 +90,9 @@ def main():
         "pid": os.getpid(),
         "mode": "codespace-worker-relay",
         "boot": True,
+        "worker_ready": False,
+        "key_hash": hashlib.sha256(os.environ.get("CHAT_QUEUE_KEY", "").encode("utf-8")).hexdigest()[:16] if os.environ.get("CHAT_QUEUE_KEY") else "",
+        "version": "lowdata-worker-v3",
     }
     body = {
         "message": f"worker status: {state}",

@@ -54,8 +54,8 @@ fi
 # Avoid duplicate workers when postStartCommand runs more than once.
 exec 9>/tmp/git-ai-worker.lock
 if ! flock -n 9; then
-  echo "Worker already running; not starting another copy."
-  python scripts/worker_status.py already_running "یک Worker دیگر از قبل در حال اجراست" || true
+  echo "Worker lock is busy; another start script or worker may already be running."
+  python scripts/worker_status.py lock_busy "قفل Worker اشغال است؛ اگر heartbeat نمی‌آید، Codespace را Stop و دوباره Start کن" || true
   exit 0
 fi
 
