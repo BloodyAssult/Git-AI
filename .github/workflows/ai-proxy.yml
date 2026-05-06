@@ -34,7 +34,9 @@ jobs:
           python-version: '3.11' # می‌توانید نسخه دلخواه پایتون خود را قرار دهید
 
       - name: Install dependencies
-        run: python -m pip install requests cryptography -q
+        run: |
+          python -m pip install requests cryptography playwright -q
+          python -m playwright install --with-deps chromium
 
       - name: Run AI proxy loop
         env:
