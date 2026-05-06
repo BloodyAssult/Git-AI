@@ -36,6 +36,7 @@ h1{font-size:24px;margin-top:12px;letter-spacing:-.4px}.sub{font-size:12.5px;col
 @media(max-width:760px){.app{padding:7px}.top{height:64px;gap:5px;padding:8px;border-radius:20px}.side{display:none;position:fixed;top:75px;right:8px;bottom:8px;width:min(86vw,340px);z-index:30;border:1px solid var(--line);box-shadow:-24px 0 70px rgba(0,0,0,.45)}.side.open{display:flex}.brand{font-size:0}.brand:before{font-size:18px;margin:0}.top select{min-width:0;max-width:none;flex:1;font-size:11px;padding:9px 7px}.toggle{padding:8px 9px;font-size:11px}.icon{padding:8px 10px}.main{padding-top:7px}.chat{border-radius:20px}.msgs{padding:14px}.msg{max-width:96%;gap:8px}.av{width:32px;height:32px;border-radius:13px;font-size:12px}.bubble{font-size:13px;border-radius:19px}.foot{padding:9px}.card{padding:18px;border-radius:24px}.tabs{margin:14px 0}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 
+.brClip{display:none;position:absolute;left:12px;top:10px;z-index:3;color:#dffcff;font-size:11px;background:rgba(3,8,23,.58);border:1px solid rgba(34,211,238,.28);border-radius:999px;padding:6px 10px;backdrop-filter:blur(10px);box-shadow:0 10px 28px rgba(0,0,0,.22);pointer-events:none}.brClip.on{display:block}
 @media(max-width:900px){.browserBody{grid-template-columns:1fr}.browserSide{max-height:38dvh}.browserBar{gap:6px}.brUrl{min-width:160px}.shotWrap{min-height:310px}}
 @media(max-width:760px){.browserBody{padding:8px}.browserPane{border-radius:22px}.browserBar{padding:9px}.brBtn{padding:9px 10px}.browserSide{max-height:42dvh}.cmdBox{flex-direction:column}.shotWrap:before{font-size:10px;right:8px;top:8px}.brUrl{width:100%;flex-basis:100%}}
 
@@ -206,19 +207,36 @@ async function decryptObj(obj){
 
 // ── GitHub Contents API ──
 function ghHeaders(){return {'Authorization':`token ${cfg.token}`,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'}}
+async function safeFetch(url,opts){
+  try{return await fetch(url,opts)}
+  catch(e){
+    const msg=(e&&e.message)||String(e||'');
+    throw new Error(msg==='Failed to fetch'?'ارتباط با GitHub API برقرار نشد. معمولاً از کندی شبکه، CORS موقت، یا بزرگ بودن فایل پاسخ است. دوباره تلاش کن؛ در این نسخه پاسخ‌های بزرگ بهتر هندل می‌شوند.':msg);
+  }
+}
 async function ghGet(path){
-  const r=await fetch(`${GH}/repos/${cfg.user}/${cfg.repo}/contents/${path}?_=${Date.now()}`,{headers:ghHeaders()});
+  const r=await safeFetch(`${GH}/repos/${cfg.user}/${cfg.repo}/contents/${path}?_=${Date.now()}`,{headers:ghHeaders()});
   if(r.status===404)return null; if(r.status===401)throw new Error('GitHub token نامعتبر است'); if(!r.ok)throw new Error('GitHub error '+r.status);
-  const d=await r.json(); return {data:b64ToJson(d.content),sha:d.sha};
+  const d=await r.json();
+  let content=d.content||'';
+  // اگر فایل پاسخ از ۱MB بزرگ‌تر شود، Contents API ممکن است content را خالی و encoding را none بدهد.
+  // در این حالت از Git Blob API استفاده می‌کنیم که محتوا را base64 برمی‌گرداند.
+  if((!content || d.encoding==='none') && d.sha){
+    const br=await safeFetch(`${GH}/repos/${cfg.user}/${cfg.repo}/git/blobs/${d.sha}?_=${Date.now()}`,{headers:ghHeaders()});
+    if(!br.ok)throw new Error('GitHub blob error '+br.status);
+    const bd=await br.json(); content=bd.content||'';
+  }
+  if(!content)throw new Error('فایل پاسخ خالی بود یا GitHub محتوای آن را برنگرداند.');
+  return {data:b64ToJson(content),sha:d.sha};
 }
 async function ghPut(path,content,sha){
   const body={message:`web: ${path}`,content:jsonToB64(content)}; if(sha)body.sha=sha;
-  const r=await fetch(`${GH}/repos/${cfg.user}/${cfg.repo}/contents/${path}`,{method:'PUT',headers:ghHeaders(),body:JSON.stringify(body)});
+  const r=await safeFetch(`${GH}/repos/${cfg.user}/${cfg.repo}/contents/${path}`,{method:'PUT',headers:ghHeaders(),body:JSON.stringify(body)});
   if(r.status===401)throw new Error('GitHub token نامعتبر است'); if(!r.ok){const t=await r.text();throw new Error('GitHub write error '+r.status+' '+t.slice(0,160))}
   return await r.json();
 }
 async function ghDel(path,sha){
-  try{await fetch(`${GH}/repos/${cfg.user}/${cfg.repo}/contents/${path}`,{method:'DELETE',headers:ghHeaders(),body:JSON.stringify({message:`web: delete ${path}`,sha})})}catch(e){}
+  try{await safeFetch(`${GH}/repos/${cfg.user}/${cfg.repo}/contents/${path}`,{method:'DELETE',headers:ghHeaders(),body:JSON.stringify({message:`web: delete ${path}`,sha})})}catch(e){}
 }
 
 // ── sessions ──
@@ -377,7 +395,7 @@ async function pollResponse(id){
 // ── Remote Browser mode ──
 function saveBrowserState(){try{localStorage.setItem(BK,JSON.stringify({sid:browserState.sid,last:browserState.last}))}catch(e){}}
 function toggleBrowser(force){browserMode=typeof force==='boolean'?force:!browserMode;$('browserBtn').classList.toggle('on',browserMode);$('browserBtn').textContent=browserMode?'💬 چت':'🌐 مرورگر';$('chatPane').classList.toggle('hidden',browserMode);$('browserPane').classList.toggle('hidden',!browserMode)}
-function setBrowserLoading(v){browserLoading=v;$('br-status').textContent=v?'در حال اجرای مرورگر در Actions...':'آماده';Array.from(document.querySelectorAll('.brBtn,.browserSide .mini')).forEach(b=>b.disabled=v)}
+function setBrowserLoading(v){browserLoading=v;$('br-status').textContent=v?'در حال اجرای مرورگر در Actions...':'آماده';if(v){const bc=$('br-clip');bc.classList.remove('on')}Array.from(document.querySelectorAll('.brBtn,.browserSide .mini')).forEach(b=>b.disabled=v)}
 function setBrowserStatus(s){$('br-status').textContent=s}
 async function browserAct(action,extra={}){
   if(browserLoading)return; if(!cfg.user||!cfg.repo||!cfg.token)return showSetup(); toggleBrowser(true); setBrowserLoading(true);
@@ -388,7 +406,7 @@ async function browserAct(action,extra={}){
     setBrowserStatus('منتظر پاسخ Actions...'); const out=await pollResponse(id);
     if(out?.browser)renderBrowser(out.browser);
     if(out?.error){const msg=out.error.message||JSON.stringify(out.error);$('br-note').textContent=(out.browser?.note?out.browser.note+'\n':'')+'❌ '+msg;}
-  }catch(e){$('br-note').textContent='❌ '+(e.message||e);setBrowserStatus('خطا')}
+  }catch(e){$('br-note').textContent='❌ '+((e&&e.message)||e||'خطای ناشناخته');$('br-clip').classList.remove('on');setBrowserStatus('خطا')}
   finally{setBrowserLoading(false)}
 }
 function browserOpen(){const url=$('br-url').value.trim(); if(!url)return alert('URL را وارد کن'); browserAct('open',{url})}
@@ -400,14 +418,15 @@ function browserClickShot(ev){if(browserLoading)return; const img=$('br-shot'); 
 function playBrowserFrames(frames, finalSrc){
   const img=$('br-shot'), badge=$('br-clip');
   if(brFrameTimer){clearInterval(brFrameTimer);brFrameTimer=null}
+  badge.classList.remove('on');
   const list=(frames||[]).filter(Boolean);
-  if(!list.length){img.src=finalSrc||'';return}
+  if(!list.length){if(finalSrc)img.src=finalSrc;return}
   let i=0; badge.classList.add('on'); img.src=list[0];
   brFrameTimer=setInterval(()=>{
     i++;
     if(i<list.length){img.src=list[i];return}
     clearInterval(brFrameTimer);brFrameTimer=null;img.src=finalSrc||list[list.length-1]||'';badge.classList.remove('on');
-  },260);
+  },220);
 }
 function renderBrowser(b){
   browserState.last=b; saveBrowserState();

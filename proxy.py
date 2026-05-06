@@ -642,7 +642,7 @@ def _get_browser_session(sid: str) -> Dict[str, Any]:
         return sess
     browser = _ensure_browser()
     context = browser.new_context(
-        viewport={"width": 1280, "height": 900},
+        viewport={"width": 1180, "height": 820},
         device_scale_factor=1,
         locale="fa-IR",
         timezone_id="Asia/Tehran",
@@ -726,12 +726,37 @@ def _safe_wait(page) -> None:
 
 
 def _capture_browser_jpeg(page, quality: int = 88) -> str:
-    # High-quality viewport screenshot. JPEG keeps queue files smaller than PNG while quality=88 is visually clear.
+    # High-quality viewport screenshot. JPEG keeps queue files smaller than PNG while quality remains clear.
     shot = page.screenshot(type="jpeg", quality=quality, full_page=False)
     return "data:image/jpeg;base64," + base64.b64encode(shot).decode("ascii")
 
 
-def _capture_transition_frames(page, count: int = 6, delay_ms: int = 260, quality: int = 88) -> List[str]:
+def _data_url_chars(items: List[str]) -> int:
+    return sum(len(x or "") for x in items)
+
+
+def _trim_frames_for_queue(frames: List[str], final_shot: str, max_chars: int = 560_000) -> List[str]:
+    """Keep the clip small enough for GitHub Contents API polling.
+
+    The stable final screenshot is sent separately, so transition frames intentionally
+    exclude it. If a page is visually heavy, we keep the first/middle frames rather
+    than breaking the request.
+    """
+    frames = [f for f in frames if f and f != final_shot]
+    if _data_url_chars(frames + [final_shot]) <= max_chars:
+        return frames
+    if len(frames) >= 3:
+        candidate = [frames[0], frames[len(frames)//2]]
+        if _data_url_chars(candidate + [final_shot]) <= max_chars:
+            return candidate
+    if frames:
+        candidate = [frames[0]]
+        if _data_url_chars(candidate + [final_shot]) <= max_chars:
+            return candidate
+    return []
+
+
+def _capture_transition_frames(page, count: int = 4, delay_ms: int = 220, quality: int = 84) -> List[str]:
     """Capture a short, high-quality 'live-ish' clip after an action.
 
     It is intentionally a finite clip, not an endless stream, to avoid abusing GitHub
@@ -750,7 +775,7 @@ def _capture_transition_frames(page, count: int = 6, delay_ms: int = 260, qualit
             pass
     _safe_wait(page)
     try:
-        final_frame = _capture_browser_jpeg(page, quality=quality)
+        final_frame = _capture_browser_jpeg(page, quality=max(quality, 90))
         frames.append(final_frame)
     except Exception as e:
         print(f"final frame capture failed: {e}")
@@ -759,12 +784,14 @@ def _capture_transition_frames(page, count: int = 6, delay_ms: int = 260, qualit
 
 def _state_payload(sess: Dict[str, Any], note: str = "", analysis: str = "", animate: bool = True) -> Dict[str, Any]:
     page = sess["page"]
-    frames = _capture_transition_frames(page) if animate else []
-    if frames:
-        screenshot = frames[-1]
+    raw_frames = _capture_transition_frames(page) if animate else []
+    if raw_frames:
+        screenshot = raw_frames[-1]
+        frames = _trim_frames_for_queue(raw_frames[:-1], screenshot)
     else:
         _safe_wait(page)
-        screenshot = _capture_browser_jpeg(page, quality=88)
+        screenshot = _capture_browser_jpeg(page, quality=90)
+        frames = []
     title = ""
     url = ""
     try:
