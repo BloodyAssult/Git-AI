@@ -770,28 +770,31 @@ def _data_url_chars(items: List[str]) -> int:
     return sum(len(x or "") for x in items)
 
 
-def _trim_frames_for_queue(frames: List[str], final_shot: str, max_chars: int = 3_800_000) -> List[str]:
-    """Keep the clip small enough for GitHub Contents API polling.
+def _trim_frames_for_queue(frames: List[str], final_shot: str, max_chars: int = 7_800_000) -> List[str]:
+    """Keep the clip small enough for GitHub polling while preserving motion.
 
     The stable final screenshot is sent separately, so transition frames intentionally
-    exclude it. If a page is visually heavy, we keep the first/middle frames rather
-    than breaking the request.
+    exclude it. With HQ mode we try to keep all 14 transition frames; if the page is
+    visually too heavy, we down-sample evenly instead of dropping directly to 1-2.
     """
     frames = [f for f in frames if f and f != final_shot]
     if _data_url_chars(frames + [final_shot]) <= max_chars:
         return frames
-    if len(frames) >= 3:
-        candidate = [frames[0], frames[len(frames)//2]]
-        if _data_url_chars(candidate + [final_shot]) <= max_chars:
-            return candidate
-    if frames:
-        candidate = [frames[0]]
+    # Try progressively fewer, evenly-spaced frames so motion still feels natural.
+    for keep in (12, 10, 8, 6, 4, 3, 2, 1):
+        if len(frames) < keep:
+            continue
+        if keep == 1:
+            candidate = [frames[len(frames)//2]]
+        else:
+            idxs = sorted(set(round(i * (len(frames)-1) / (keep-1)) for i in range(keep)))
+            candidate = [frames[i] for i in idxs]
         if _data_url_chars(candidate + [final_shot]) <= max_chars:
             return candidate
     return []
 
 
-def _capture_transition_frames(page, count: int = 8, delay_ms: int = 140, quality: int = 92) -> List[str]:
+def _capture_transition_frames(page, count: int = 15, delay_ms: int = 95, quality: int = 92) -> List[str]:
     """Capture a short, high-quality 'live-ish' clip after an action.
 
     It is intentionally a finite clip, not an endless stream, to avoid abusing GitHub
@@ -852,7 +855,7 @@ def _state_payload(sess: Dict[str, Any], note: str = "", analysis: str = "", ani
             "text_preview": text,
             "ts": int(time.time()),
             "device_scale_factor": 1.5,
-            "frame_profile": "hq-8frames",
+            "frame_profile": "hq-15frames",
         },
         "meta": {"provider": "github-actions", "model": "playwright/chromium", "requested_model": "browser-agent"},
     }

@@ -36,7 +36,7 @@ h1{font-size:24px;margin-top:12px;letter-spacing:-.4px}.sub{font-size:12.5px;col
 @media(max-width:760px){.app{padding:7px}.top{height:64px;gap:5px;padding:8px;border-radius:20px}.side{display:none;position:fixed;top:75px;right:8px;bottom:8px;width:min(86vw,340px);z-index:30;border:1px solid var(--line);box-shadow:-24px 0 70px rgba(0,0,0,.45)}.side.open{display:flex}.brand{font-size:0}.brand:before{font-size:18px;margin:0}.top select{min-width:0;max-width:none;flex:1;font-size:11px;padding:9px 7px}.toggle{padding:8px 9px;font-size:11px}.icon{padding:8px 10px}.main{padding-top:7px}.chat{border-radius:20px}.msgs{padding:14px}.msg{max-width:96%;gap:8px}.av{width:32px;height:32px;border-radius:13px;font-size:12px}.bubble{font-size:13px;border-radius:19px}.foot{padding:9px}.card{padding:18px;border-radius:24px}.tabs{margin:14px 0}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 
-.brClip{display:none;position:absolute;left:12px;top:10px;z-index:3;color:#dffcff;font-size:11px;background:rgba(3,8,23,.58);border:1px solid rgba(34,211,238,.28);border-radius:999px;padding:6px 10px;backdrop-filter:blur(10px);box-shadow:0 10px 28px rgba(0,0,0,.22);pointer-events:none}.brClip.on{display:block}
+.brClip{display:none;position:absolute;left:12px;top:10px;z-index:3;color:#dffcff;font-size:11px;background:rgba(3,8,23,.58);border:1px solid rgba(34,211,238,.28);border-radius:999px;padding:6px 10px;backdrop-filter:blur(10px);box-shadow:0 10px 28px rgba(0,0,0,.22);pointer-events:none}.brClip.on{display:block}.brFullBtn{position:absolute;left:12px;bottom:12px;z-index:4;border:1px solid rgba(255,255,255,.18);border-radius:14px;background:rgba(3,8,23,.58);color:#e6fbff;padding:9px 12px;font-weight:950;font-size:12px;backdrop-filter:blur(12px);box-shadow:0 14px 36px rgba(0,0,0,.28)}.brFullBtn:hover{background:rgba(34,211,238,.16);border-color:rgba(34,211,238,.36)}.shotWrap.shotFull,#shotWrap:fullscreen{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;z-index:120!important;border-radius:0!important;border:0!important;background:#020617!important;display:flex!important;align-items:center!important;justify-content:center!important;overflow:auto!important;padding:10px!important}.shotWrap.shotFull:before,#shotWrap:fullscreen:before{top:14px;right:14px}.shotWrap.shotFull img,#shotWrap:fullscreen img{max-width:100%!important;max-height:100%!important;width:auto!important;height:auto!important;object-fit:contain!important}.shotWrap.shotFull .brFullBtn,#shotWrap:fullscreen .brFullBtn{left:16px;bottom:16px;background:rgba(15,23,42,.82);font-size:13px;padding:11px 14px}
 @media(max-width:900px){.browserBody{grid-template-columns:1fr}.browserSide{max-height:38dvh}.browserBar{gap:6px}.brUrl{min-width:160px}.shotWrap{min-height:310px}}
 @media(max-width:760px){.browserBody{padding:8px}.browserPane{border-radius:22px}.browserBar{padding:9px}.brBtn{padding:9px 10px}.browserSide{max-height:42dvh}.cmdBox{flex-direction:column}.shotWrap:before{font-size:10px;right:8px;top:8px}.brUrl{width:100%;flex-basis:100%}}
 
@@ -134,7 +134,7 @@ h1{font-size:24px;margin-top:12px;letter-spacing:-.4px}.sub{font-size:12.5px;col
       <div class="browserBody">
         <div class="browserView">
           <div class="brInfo"><span class="brPill" id="br-title">مرورگر ریموت آماده است</span><span class="brPill" id="br-current-url">هنوز صفحه‌ای باز نشده</span><span class="brStatus" id="br-status">آماده</span></div>
-          <div class="shotWrap" id="shotWrap"><div class="brClip" id="br-clip">در حال پخش ویدیوی کوتاه…</div><div class="browserEmpty" id="br-empty"><div class="globe">🌐</div><div>URL را وارد کن یا دستور بده؛ Chromium داخل GitHub Actions اجرا می‌شود.</div></div><img id="br-shot" alt="Remote browser screenshot" style="display:none" onclick="browserClickShot(event)"></div>
+          <div class="shotWrap" id="shotWrap"><div class="brClip" id="br-clip">در حال پخش ویدیوی کوتاه…</div><button class="brFullBtn" id="br-full" style="display:none" onclick="toggleShotFullscreen(event)" title="بزرگ‌نمایی مرورگر">⛶ بزرگ</button><div class="browserEmpty" id="br-empty"><div class="globe">🌐</div><div>URL را وارد کن یا دستور بده؛ Chromium داخل GitHub Actions اجرا می‌شود.</div></div><img id="br-shot" alt="Remote browser screenshot" style="display:none" onclick="browserClickShot(event)"></div>
         </div>
         <aside class="browserSide">
           <h3>دستور مرورگر</h3>
@@ -487,6 +487,9 @@ function browserCommand(){const command=$('br-cmd').value.trim(); if(!command)re
 function browserAnalyze(){const command=$('br-cmd').value.trim()||'این صفحه را خلاصه و تحلیل کن'; browserAct('analyze',{command})}
 function browserClickIndex(i){browserAct('click_index',{index:i})}
 function browserTypeIndex(i){const text=window.prompt('متنی که باید وارد شود:'); if(text!==null&&text!=='')browserAct('type_index',{index:i,text})}
+function syncShotFullscreen(){const w=$('shotWrap'),b=$('br-full');const on=!!document.fullscreenElement||w.classList.contains('shotFull');if(b)b.textContent=on?'✕ خروج':'⛶ بزرگ'}
+function toggleShotFullscreen(ev){if(ev){ev.preventDefault();ev.stopPropagation()}const w=$('shotWrap');if(!w)return;if(document.fullscreenElement){document.exitFullscreen().catch(()=>{});w.classList.remove('shotFull');syncShotFullscreen();return}w.classList.add('shotFull');syncShotFullscreen();if(w.requestFullscreen){w.requestFullscreen().catch(()=>{w.classList.add('shotFull');syncShotFullscreen()})}}
+document.addEventListener('fullscreenchange',()=>{const w=$('shotWrap');if(!document.fullscreenElement&&w)w.classList.remove('shotFull');syncShotFullscreen()});
 function browserClickShot(ev){if(browserLoading)return; const img=$('br-shot'); if(!img.src)return; const r=img.getBoundingClientRect(); const scale=Number(browserState.last?.device_scale_factor||1); const rawX=(ev.clientX-r.left)*(img.naturalWidth/r.width); const rawY=(ev.clientY-r.top)*(img.naturalHeight/r.height); const x=Math.round(rawX/scale); const y=Math.round(rawY/scale); browserAct('click_xy',{x,y})}
 function playBrowserFrames(frames, finalSrc){
   const img=$('br-shot'), badge=$('br-clip');
@@ -499,11 +502,11 @@ function playBrowserFrames(frames, finalSrc){
     i++;
     if(i<list.length){img.src=list[i];return}
     clearInterval(brFrameTimer);brFrameTimer=null;img.src=finalSrc||list[list.length-1]||'';badge.classList.remove('on');
-  },150);
+  },115);
 }
 function renderBrowser(b){
   browserState.last=b; saveBrowserState();
-  $('br-empty').style.display='none'; const img=$('br-shot'); img.style.display='block';
+  $('br-empty').style.display='none'; const img=$('br-shot'); img.style.display='block'; const fb=$('br-full'); if(fb)fb.style.display='block';
   playBrowserFrames(b.frames||[], b.screenshot||'');
   $('br-title').textContent=b.title||'بدون عنوان'; $('br-current-url').textContent=b.url||''; if(b.url)$('br-url').value=b.url;
   $('br-note').textContent=b.note||'وضعیت صفحه دریافت شد.';
