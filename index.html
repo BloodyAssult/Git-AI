@@ -280,20 +280,38 @@ async function readWorkerStatus(){
     return res&&res.data?res.data:null;
   }catch(e){return null}
 }
+function workerStatusAge(st){return Math.round((Date.now()-Number(st?.ts||0)*1000)/1000)}
+function workerStatusFresh(st, maxAge=45){const age=workerStatusAge(st);return !!(st&&st.ok!==false&&Number.isFinite(age)&&age>=-5&&age<maxAge&&['idle','started','processing','already_running'].includes(String(st.state||'idle')))}
+function workerStatusText(st){
+  if(!st)return codespaceName?`Codespace: ${codespaceName} · منتظر heartbeat`:'Worker نامشخص';
+  const age=workerStatusAge(st), state=String(st.state||'idle');
+  const msg=st.message?` · ${st.message}`:'';
+  return `${state==='error'||state==='missing_key'||st.ok===false?'Worker خطا':'Worker'} · ${st.codespace||codespaceName||'codespace'} · ${Number.isFinite(age)?age+' ثانیه پیش':'همین الان'}${msg}`;
+}
 function updateWorkerStatusFromObj(st){
   if(!st){setCodeStatus(codespaceName?`Codespace: ${codespaceName} · منتظر heartbeat`:'Worker نامشخص','warn');return}
-  const age=Math.round((Date.now()-Number(st.ts||0)*1000)/1000);
-  const ok=Number.isFinite(age)&&age<75;
-  const text=`Worker ${ok?'زنده':'قدیمی'} · ${st.codespace||codespaceName||'codespace'} · ${age>=0?age+' ثانیه پیش':'همین الان'}`;
-  setCodeStatus(text,ok?'ok':'warn');
+  const state=String(st.state||'idle');
+  if(state==='error'||state==='missing_key'||st.ok===false){setCodeStatus(workerStatusText(st),'bad');return}
+  setCodeStatus(workerStatusText(st),workerStatusFresh(st)?'ok':'warn');
 }
 async function refreshWorkerStatus(manual=false){
-  if(!cfg.user||!cfg.repo||!cfg.token){if(manual)showSetup();return}
+  if(!cfg.user||!cfg.repo||!cfg.token){if(manual)showSetup();return null}
   try{
     const st=await readWorkerStatus();
     updateWorkerStatusFromObj(st);
-    if(manual)setBrowserStatus(st?'وضعیت Worker دریافت شد.':'هنوز heartbeat از Worker پیدا نشد.');
-  }catch(e){if(manual)setBrowserStatus('خطا در خواندن وضعیت Worker: '+e.message)}
+    if(manual)setBrowserStatus(st?workerStatusText(st):'هنوز heartbeat از Worker پیدا نشد. اگر Codespace را قبل از این نسخه ساخته‌ای، یک‌بار Rebuild یا Codespace تازه بساز.');
+    return st;
+  }catch(e){if(manual)setBrowserStatus('خطا در خواندن وضعیت Worker: '+e.message);return null}
+}
+async function waitForWorkerReady(maxMs=70000){
+  const deadline=Date.now()+maxMs; let last=null;
+  while(Date.now()<deadline){
+    last=await refreshWorkerStatus(false);
+    if(workerStatusFresh(last))return last;
+    if(last&&(last.state==='error'||last.state==='missing_key'||last.ok===false))throw new Error(workerStatusText(last));
+    await sleep(2500);
+  }
+  throw new Error(last?('Worker هنوز آماده نیست: '+workerStatusText(last)):'Worker heartbeat نداد؛ احتمالاً postStart اجرا نشده یا Codespaces Secretها داخل container نیستند.');
 }
 async function startCodespaceWorker(){
   if(codespaceBusy)return; if(!cfg.user||!cfg.repo||!cfg.token)return showSetup();
@@ -306,15 +324,20 @@ async function startCodespaceWorker(){
       await codespaceApi(`/user/codespaces/${encodeURIComponent(cs.name)}/start`,{method:'POST'});
       setCodeStatus(`Codespace: ${cs.name} · در حال روشن شدن`,'warn');
     }
-    for(let i=0;i<36;i++){
-      await sleep(5000);
+    for(let i=0;i<48;i++){
+      await sleep(3500);
       const now=await getCodespace(cs.name).catch(()=>null);
-      if(now) setCodeStatus(`Codespace: ${cs.name} · ${codeStateText(now)}`,/available|ready|started|running/i.test(String(now.state||now.status||''))?'ok':'warn');
       const ws=await readWorkerStatus();
-      if(ws&&Date.now()-Number(ws.ts||0)*1000<90000){updateWorkerStatusFromObj(ws);setBrowserStatus('Worker آماده است؛ حالا URL بده یا روی صفحه کلیک کن.');return}
+      if(ws){
+        updateWorkerStatusFromObj(ws);
+        if(ws.state==='error'||ws.state==='missing_key'||ws.ok===false){setBrowserStatus(workerStatusText(ws));return}
+        if(workerStatusFresh(ws)){setBrowserStatus('Worker آماده است؛ حالا URL بده یا روی صفحه کلیک کن.');return}
+      }else if(now){
+        setCodeStatus(`Codespace: ${cs.name} · ${codeStateText(now)} · منتظر heartbeat`,/available|ready|started|running/i.test(String(now.state||now.status||''))?'warn':'warn');
+      }
       setBrowserStatus(`منتظر auto-start شدن Worker... ${i+1}`);
     }
-    setBrowserStatus('Codespace روشن شد، ولی heartbeat Worker نرسید. CHAT_QUEUE_KEY را به Codespaces Secret اضافه کرده‌ای؟');
+    setBrowserStatus('Codespace روشن شد، ولی heartbeat Worker نرسید. اگر Codespace قدیمی است Rebuild یا یک Codespace تازه بساز؛ همچنین CHAT_QUEUE_KEY را در Codespaces Secrets چک کن.');
     setCodeStatus(`Codespace: ${cs.name} · بدون heartbeat`,'warn');
   }catch(e){setBrowserStatus('خطا: '+e.message); setCodeStatus('خطا در روشن کردن Worker','bad')}
   finally{codespaceBusy=false;updateBrowserBackendUI()}
@@ -333,7 +356,7 @@ async function stopCodespaceWorker(){
 }
 function startWorkerStatusTimer(){
   if(csStatusTimer)clearInterval(csStatusTimer);
-  csStatusTimer=setInterval(()=>{if(browserMode&&browserBackend==='worker')refreshWorkerStatus(false)},30000);
+  csStatusTimer=setInterval(()=>{if(browserMode&&browserBackend==='worker')refreshWorkerStatus(false)},12000);
 }
 
 async function getDefaultBranch(){
@@ -559,6 +582,14 @@ async function pollResponse(id,opts={}){
       lastErr=((e&&e.message)||String(e)).slice(0,90);
       if(/token|401|403|rate limit|دسترسی/.test(lastErr))throw e;
     }
+    if(isWorker && n%5===0){
+      const ws=await readWorkerStatus();
+      if(ws){
+        updateWorkerStatusFromObj(ws);
+        if(ws.state==='error'||ws.state==='missing_key'||ws.ok===false)throw new Error(workerStatusText(ws));
+        if(!workerStatusFresh(ws,95)&&n>12)throw new Error('heartbeat قدیمی شد: '+workerStatusText(ws));
+      }
+    }
     if(!isWorker && n%6===0){
       try{
         const st=await proxyRunStatus();
@@ -592,8 +623,11 @@ async function browserAct(action,extra={}){
     const envelope=await encryptObj(payload); await ghPut(`${queueDir}/prompt_${id}.json`,envelope,null);
     if(browserBackend==='worker'){
       const ws=await readWorkerStatus();
-      if(!ws||Date.now()-Number(ws.ts||0)*1000>120000){setBrowserStatus('Worker heartbeat تازه نیست؛ اگر پاسخ نیامد دکمه روشن کردن Worker را بزن.')}
-      else setBrowserStatus('منتظر Codespace Worker...');
+      if(!workerStatusFresh(ws,60)){
+        setBrowserStatus('Worker آماده نیست؛ اول وضعیت را تازه می‌کنم...');
+        await waitForWorkerReady(55000);
+      }
+      setBrowserStatus('منتظر Codespace Worker...');
     }else{
       setBrowserStatus('در حال روشن کردن Action...');
       await wakeProxyLoop();

@@ -23,7 +23,7 @@ import requests
 BASE = "https://api.github.com"
 QUEUE_DIR = os.environ.get("WORKER_QUEUE_DIR", "browser_queue").strip("/") or "browser_queue"
 POLL_SECONDS = float(os.environ.get("WORKER_POLL_SECONDS", "1.2"))
-HEARTBEAT_SECONDS = float(os.environ.get("WORKER_HEARTBEAT_SECONDS", "25"))
+HEARTBEAT_SECONDS = float(os.environ.get("WORKER_HEARTBEAT_SECONDS", "8"))
 
 
 def _run(cmd: List[str]) -> str:
@@ -122,6 +122,7 @@ def write_worker_status(extra: Optional[Dict[str, Any]] = None) -> None:
         old_sha = proxy.get_file_sha(status_path)
         payload: Dict[str, Any] = {
             "ok": True,
+            "state": "idle",
             "ts": time.time(),
             "repo": REPO,
             "queue": QUEUE_DIR,
@@ -139,7 +140,7 @@ def write_worker_status(extra: Optional[Dict[str, Any]] = None) -> None:
 def process_prompt_file(path: str, sha: str) -> None:
     req_id = id_from_prompt_path(path)
     print(f"[worker] processing {path} req_id={req_id}", flush=True)
-    write_worker_status({"state": "processing", "request_id": req_id})
+    write_worker_status({"state": "processing", "request_id": req_id, "message": f"processing {req_id}"})
     current_sha: Optional[str] = sha
     try:
         raw, current_sha = proxy.get_file(path)
@@ -149,6 +150,7 @@ def process_prompt_file(path: str, sha: str) -> None:
             data = proxy.decrypt_envelope(raw)
         except Exception as e:
             write_response(req_id, {"error": {"code": 401, "message": str(e)}})
+            write_worker_status({"ok": False, "state": "error", "request_id": req_id, "message": "decrypt failed: " + str(e)[:220]})
             return
         if data.get("id"):
             req_id = str(data["id"])
@@ -166,12 +168,13 @@ def process_prompt_file(path: str, sha: str) -> None:
         write_response(req_id, result)
         if current_sha:
             proxy.delete_file(path, current_sha)
-        write_worker_status({"state": "idle", "last_request_id": req_id, "last_done": time.time()})
+        write_worker_status({"state": "idle", "last_request_id": req_id, "last_done": time.time(), "message": f"done {req_id}"})
         print(f"[worker] done req_id={req_id}", flush=True)
     except Exception as e:
         print(f"[worker] error: {e}", flush=True)
         traceback.print_exc()
         write_response(req_id, {"error": {"code": 500, "message": str(e), "trace": traceback.format_exc()[-1800:]}})
+        write_worker_status({"ok": False, "state": "error", "request_id": req_id, "message": str(e)[:260]})
 
 
 def main() -> None:
@@ -182,7 +185,7 @@ def main() -> None:
     print("Stop with Ctrl+C")
     processed = set()
     last_heartbeat = 0.0
-    write_worker_status({"state": "started"})
+    write_worker_status({"state": "started", "message": "codespace_worker.py started"})
     while True:
         try:
             if time.time() - last_heartbeat >= HEARTBEAT_SECONDS:
