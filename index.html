@@ -128,13 +128,14 @@ h1{font-size:24px;margin-top:12px;letter-spacing:-.4px}.sub{font-size:12.5px;col
         <button class="brBtn primary" onclick="browserOpen()">برو</button>
         <button class="brBtn" onclick="browserAct('back')">← برگشت</button>
         <button class="brBtn" onclick="browserAct('reload')">↻ رفرش</button>
+        <button class="brBtn" onclick="browserAct('frames')">🎞️ تجدید فریم</button>
         <button class="brBtn" onclick="browserAct('scroll',{dy:760})">↓ اسکرول</button>
         <button class="brBtn" onclick="browserAct('scroll',{dy:-760})">↑ بالا</button>
       </div>
       <div class="browserBody">
         <div class="browserView">
           <div class="brInfo"><span class="brPill" id="br-title">مرورگر ریموت آماده است</span><span class="brPill" id="br-current-url">هنوز صفحه‌ای باز نشده</span><span class="brStatus" id="br-status">آماده</span></div>
-          <div class="shotWrap" id="shotWrap"><div class="brClip" id="br-clip">در حال پخش ویدیوی کوتاه…</div><button class="brFullBtn" id="br-full" style="display:none" onclick="toggleShotFullscreen(event)" title="بزرگ‌نمایی مرورگر">⛶ بزرگ</button><div class="browserEmpty" id="br-empty"><div class="globe">🌐</div><div>URL را وارد کن یا دستور بده؛ Chromium داخل GitHub Actions اجرا می‌شود.</div></div><img id="br-shot" alt="Remote browser screenshot" style="display:none" onclick="browserClickShot(event)"></div>
+          <div class="shotWrap" id="shotWrap"><div class="brClip" id="br-clip">در حال پخش ۲۵ فریم تازه…</div><button class="brFullBtn" id="br-full" style="display:none" onclick="toggleShotFullscreen(event)" title="بزرگ‌نمایی مرورگر">⛶ بزرگ</button><div class="browserEmpty" id="br-empty"><div class="globe">🌐</div><div>URL را وارد کن یا دستور بده؛ Chromium داخل GitHub Actions اجرا می‌شود.</div></div><img id="br-shot" alt="Remote browser screenshot" style="display:none" onclick="browserClickShot(event)"></div>
         </div>
         <aside class="browserSide">
           <h3>دستور مرورگر</h3>
@@ -502,7 +503,7 @@ function playBrowserFrames(frames, finalSrc){
     i++;
     if(i<list.length){img.src=list[i];return}
     clearInterval(brFrameTimer);brFrameTimer=null;img.src=finalSrc||list[list.length-1]||'';badge.classList.remove('on');
-  },80);
+  },55);
 }
 function renderBrowser(b){
   browserState.last=b; saveBrowserState();

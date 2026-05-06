@@ -751,60 +751,126 @@ def _safe_wait(page) -> None:
 
 
 
+def _jpeg_data_url(raw: bytes) -> str:
+    return "data:image/jpeg;base64," + base64.b64encode(raw).decode("ascii")
+
+
 def _capture_browser_jpeg(page, quality: int = 94, max_chars: int = 1_200_000) -> str:
     # High-quality viewport screenshot. JPEG keeps queue files smaller than PNG while quality remains clear.
-    # The max_chars cap prevents GitHub API fetches from hanging on very large JSON responses.
+    # For browser frames we prefer preserving quality; max_chars is only a safety valve for unusually huge pages.
     q = int(quality)
     last = b""
-    while q >= 76:
+    while q >= 82:
         shot = page.screenshot(type="jpeg", quality=q, full_page=False)
         last = shot
-        data = "data:image/jpeg;base64," + base64.b64encode(shot).decode("ascii")
+        data = _jpeg_data_url(shot)
         if not max_chars or len(data) <= max_chars:
             return data
-        q -= 6
-    return "data:image/jpeg;base64," + base64.b64encode(last).decode("ascii")
+        q -= 4
+    return _jpeg_data_url(last)
 
 
 def _data_url_chars(items: List[str]) -> int:
     return sum(len(x or "") for x in items)
 
 
-def _trim_frames_for_queue(frames: List[str], final_shot: str, max_chars: int = 12_800_000) -> List[str]:
-    """Keep the clip small enough for GitHub polling while preserving motion.
+def _evenly_sample(items: List[str], keep: int) -> List[str]:
+    if keep <= 0:
+        return []
+    if len(items) <= keep:
+        return items
+    if keep == 1:
+        return [items[len(items) // 2]]
+    idxs = sorted(set(round(i * (len(items) - 1) / (keep - 1)) for i in range(keep)))
+    out = [items[i] for i in idxs]
+    # If rounding collapsed an index, fill from the end to reach the requested count.
+    if len(out) < keep:
+        used = set(id(x) for x in out)
+        for x in reversed(items):
+            if id(x) not in used:
+                out.append(x)
+                used.add(id(x))
+            if len(out) >= keep:
+                break
+    return out[:keep]
+
+
+def _trim_frames_for_queue(frames: List[str], final_shot: str, max_chars: int = 18_500_000) -> List[str]:
+    """Keep the clip small enough for GitHub polling while preserving motion and image quality.
 
     The stable final screenshot is sent separately, so transition frames intentionally
-    exclude it. With HQ 25-frame mode we try to keep all 24 transition frames; if the page is
-    visually too heavy, we down-sample evenly instead of dropping directly to 1-2.
+    exclude it. In HQ 25-frame mode we try to keep all 24 transition frames; if the page is
+    visually too heavy, we down-sample evenly instead of reducing JPEG quality first.
     """
     frames = [f for f in frames if f and f != final_shot]
     if _data_url_chars(frames + [final_shot]) <= max_chars:
         return frames
-    # Try progressively fewer, evenly-spaced frames so motion still feels natural.
     for keep in (24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 3, 2, 1):
         if len(frames) < keep:
             continue
-        if keep == 1:
-            candidate = [frames[len(frames)//2]]
-        else:
-            idxs = sorted(set(round(i * (len(frames)-1) / (keep-1)) for i in range(keep)))
-            candidate = [frames[i] for i in idxs]
+        candidate = _evenly_sample(frames, keep)
         if _data_url_chars(candidate + [final_shot]) <= max_chars:
             return candidate
     return []
 
 
-def _capture_transition_frames(page, count: int = 25, delay_ms: int = 72, quality: int = 90) -> List[str]:
+def _capture_screencast_frames(page, count: int = 25, duration_ms: int = 760, quality: int = 92) -> List[str]:
+    """Fast path: use Playwright's native screencast callback when available.
+
+    This collects JPEG frames from Chromium without forcing 25 full screenshot calls.
+    It keeps quality high and usually finishes much faster. Older Playwright versions
+    fall back to the screenshot burst path.
+    """
+    sc = getattr(page, "screencast", None)
+    if not sc:
+        return []
+    frames: List[str] = []
+
+    def on_frame(frame: Dict[str, Any]) -> None:
+        try:
+            data = frame.get("data") if isinstance(frame, dict) else None
+            if data:
+                frames.append(_jpeg_data_url(data))
+        except Exception as e:
+            print(f"screencast frame failed: {e}")
+
+    try:
+        sc.start(on_frame=on_frame, quality=int(quality))
+        page.wait_for_timeout(max(200, int(duration_ms)))
+        sc.stop()
+    except Exception as e:
+        print(f"screencast unavailable, falling back: {e}")
+        try:
+            sc.stop()
+        except Exception:
+            pass
+        return []
+    if not frames:
+        return []
+    # Keep the visual timeline smooth and exactly bounded.
+    return _evenly_sample(frames, count)
+
+
+def _capture_transition_frames(page, count: int = 25, delay_ms: int = 28, quality: int = 92) -> List[str]:
     """Capture a short, high-quality 'live-ish' clip after an action.
 
-    It is intentionally a finite clip, not an endless stream, to avoid abusing GitHub
-    Actions/API limits. The last frame is captured after a final settle attempt and
-    should be used as the stable browser screenshot.
+    First tries Playwright native screencast for speed. Fallback is a faster screenshot
+    burst with the same JPEG quality target. The last frame should be used as the stable
+    browser screenshot.
     """
-    frames: List[str] = []
+    frames = _capture_screencast_frames(page, count=count, duration_ms=760, quality=quality)
+    if frames:
+        try:
+            final_frame = _capture_browser_jpeg(page, quality=96, max_chars=2_400_000)
+            frames.append(final_frame)
+        except Exception:
+            pass
+        return frames[-count:]
+
+    frames = []
     for i in range(max(1, count - 1)):
         try:
-            frames.append(_capture_browser_jpeg(page, quality=quality, max_chars=650_000))
+            frames.append(_capture_browser_jpeg(page, quality=quality, max_chars=950_000))
         except Exception as e:
             print(f"frame capture {i} failed: {e}")
         try:
@@ -813,11 +879,10 @@ def _capture_transition_frames(page, count: int = 25, delay_ms: int = 72, qualit
             pass
     _safe_wait(page)
     try:
-        final_frame = _capture_browser_jpeg(page, quality=96, max_chars=1_800_000)
+        final_frame = _capture_browser_jpeg(page, quality=96, max_chars=2_400_000)
         frames.append(final_frame)
     except Exception as e:
         print(f"final frame capture failed: {e}")
-    # Keep response size sane. If something odd happens, cap it.
     return frames[-count:]
 
 def _state_payload(sess: Dict[str, Any], note: str = "", analysis: str = "", animate: bool = True) -> Dict[str, Any]:
@@ -855,7 +920,7 @@ def _state_payload(sess: Dict[str, Any], note: str = "", analysis: str = "", ani
             "text_preview": text,
             "ts": int(time.time()),
             "device_scale_factor": 1.5,
-            "frame_profile": "hq-25frames-adaptive",
+            "frame_profile": "hq-25frames-fast-screencast",
         },
         "meta": {"provider": "github-actions", "model": "playwright/chromium", "requested_model": "browser-agent"},
     }
@@ -995,6 +1060,8 @@ def run_browser_request(data: Dict[str, Any]) -> Dict[str, Any]:
         elif action == "reload":
             page.reload(wait_until="domcontentloaded", timeout=30000)
             note = "صفحه تازه‌سازی شد."
+        elif action in ("frames", "refresh_frames", "capture_frames"):
+            note = "۲۵ فریم تازه از وضعیت فعلی صفحه گرفته شد."
         elif action == "analyze":
             provider = data.get("provider", "github")
             model = data.get("model", "openai/gpt-4.1-mini")
