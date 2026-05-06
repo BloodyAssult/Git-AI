@@ -27,8 +27,14 @@ h1{font-size:24px;margin-top:12px;letter-spacing:-.4px}.sub{font-size:12.5px;col
 .main{flex:1;display:flex;min-height:0;gap:10px;padding-top:10px}.side{width:280px;border:1px solid var(--line);border-radius:24px;background:linear-gradient(180deg,rgba(255,255,255,.095),rgba(255,255,255,.052));backdrop-filter:blur(22px) saturate(1.2);display:flex;flex-direction:column;box-shadow:0 20px 70px rgba(0,0,0,.22)}.side.hide{display:none}.sidehead{padding:13px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}.sidehead span{font-size:12px;color:var(--muted);font-weight:900}.new{border:1px solid rgba(139,92,246,.35);background:rgba(139,92,246,.14);color:#e8e2ff;border-radius:12px;padding:7px 11px}.sessions{padding:9px;overflow:auto}.si{position:relative;padding:12px;border-radius:17px;margin-bottom:7px;cursor:pointer;color:var(--muted);border:1px solid transparent;transition:.18s ease}.si:hover,.si.on{background:rgba(255,255,255,.085);border-color:rgba(255,255,255,.11);color:var(--text);box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}.si.on{background:linear-gradient(135deg,rgba(139,92,246,.20),rgba(45,212,191,.10))}.si .t{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:24px}.si .d{font-size:10px;color:var(--muted2);margin-top:5px}.del{position:absolute;left:10px;top:9px;background:transparent;border:0;color:var(--muted2);font-size:18px}
 .chat{flex:1;display:flex;flex-direction:column;min-width:0;border:1px solid var(--line);border-radius:24px;background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.028));backdrop-filter:blur(18px);overflow:hidden}.msgs{flex:1;overflow:auto;padding:22px;display:flex;flex-direction:column;gap:15px;scroll-behavior:smooth}.msgs::-webkit-scrollbar,.sessions::-webkit-scrollbar{width:8px}.msgs::-webkit-scrollbar-thumb,.sessions::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:99px}.empty{margin:auto;text-align:center;color:var(--muted);padding:26px;border:1px solid var(--line);border-radius:28px;background:rgba(255,255,255,.055);box-shadow:inset 0 1px 0 rgba(255,255,255,.08);animation:riseIn .45s ease}.empty .big{font-size:56px;margin-bottom:9px;text-shadow:0 0 28px rgba(139,92,246,.45)}.empty h2{font-size:21px;margin-bottom:8px}.msg{display:flex;gap:11px;max-width:86%;align-self:flex-start;animation:riseIn .25s ease}.msg.user{align-self:flex-end;flex-direction:row-reverse}.av{width:36px;height:36px;border-radius:15px;background:linear-gradient(135deg,var(--accent),var(--accent3));display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:900;box-shadow:0 10px 30px rgba(139,92,246,.22)}.msg.user .av{background:linear-gradient(135deg,var(--blue),var(--accent2));box-shadow:0 10px 30px rgba(45,212,191,.18)}.bubble{position:relative;background:linear-gradient(180deg,rgba(255,255,255,.115),rgba(255,255,255,.068));border:1px solid rgba(255,255,255,.14);border-radius:22px;padding:13px 15px;line-height:2;font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere;box-shadow:0 16px 45px rgba(0,0,0,.17),inset 0 1px 0 rgba(255,255,255,.08)}.msg.model .bubble:before{content:"";position:absolute;inset:0;border-radius:inherit;background:radial-gradient(circle at 6% 0,rgba(139,92,246,.12),transparent 30%);pointer-events:none}.msg.user .bubble{background:linear-gradient(135deg,rgba(37,99,235,.45),rgba(45,212,191,.22));border-color:rgba(96,165,250,.24)}.imgs{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px}.imgs img{max-width:168px;max-height:168px;border-radius:16px;border:1px solid var(--line);box-shadow:0 12px 34px rgba(0,0,0,.22)}.meta{font-size:10px;color:#aaa4cc;margin-top:9px;direction:ltr;text-align:left;border-top:1px solid rgba(255,255,255,.08);padding-top:7px}
 .foot{border-top:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.045));padding:12px;flex-shrink:0}.tools{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}.preview{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}.pw{position:relative}.pw img{width:66px;height:66px;object-fit:cover;border-radius:16px;border:1px solid var(--line);box-shadow:0 10px 26px rgba(0,0,0,.18)}.rm{position:absolute;left:-6px;top:-6px;background:var(--red);color:white;border:0;border-radius:99px;width:22px;height:22px}.row{display:flex;gap:9px;align-items:flex-end}textarea{flex:1;resize:none;max-height:170px;background:rgba(8,10,27,.56);color:var(--text);border:1.5px solid var(--line);outline:none;border-radius:22px;padding:13px 15px;line-height:1.85;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}textarea:focus{border-color:rgba(45,212,191,.58);box-shadow:0 0 0 4px rgba(45,212,191,.10)}.send{width:50px;height:50px;border:0;border-radius:19px;background:linear-gradient(135deg,var(--accent2),var(--blue) 48%,var(--accent));color:white;font-size:20px;font-weight:950;box-shadow:0 16px 36px rgba(34,211,238,.26)}.send:disabled{opacity:.55;cursor:not-allowed}.cancel{display:none;width:50px;height:50px;border:1px solid rgba(251,113,133,.36);border-radius:19px;background:rgba(251,113,133,.12);color:#ffb2bd;font-size:19px}.cancel.show{display:block}.status{font-size:11px;color:var(--muted2);text-align:center;margin-top:7px;min-height:16px}#file{display:none}
+.chat.hidden,.browserPane.hidden{display:none!important}.browserPane{flex:1;min-width:0;border:1px solid var(--line);border-radius:24px;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));backdrop-filter:blur(18px);overflow:hidden;display:flex;flex-direction:column}.browserBar{padding:12px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,.045)}.brUrl{flex:1;min-width:220px;border:1px solid var(--line);border-radius:16px;background:rgba(8,10,27,.56);color:var(--text);padding:11px 13px;direction:ltr;outline:none}.brBtn{border:1px solid var(--line);border-radius:15px;background:rgba(255,255,255,.075);color:var(--text);padding:10px 12px;font-weight:900}.brBtn.primary{background:linear-gradient(135deg,var(--accent2),var(--blue));border-color:rgba(34,211,238,.45);color:#04111d}.browserBody{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:10px;padding:12px;overflow:hidden}.browserView{min-width:0;min-height:0;display:flex;flex-direction:column;gap:9px}.brInfo{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:12px}.brPill{border:1px solid var(--line);background:rgba(255,255,255,.06);border-radius:999px;padding:6px 10px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.shotWrap{position:relative;flex:1;min-height:240px;border:1px solid rgba(34,211,238,.22);border-radius:22px;overflow:auto;background:rgba(0,0,0,.22);box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}.shotWrap:before{content:'برای کلیک مستقیم، روی اسکرین‌شات لمس کن';position:absolute;right:12px;top:10px;z-index:1;color:rgba(255,255,255,.68);font-size:11px;background:rgba(0,0,0,.32);border:1px solid rgba(255,255,255,.12);border-radius:99px;padding:5px 9px;pointer-events:none}.shotWrap img{display:block;max-width:100%;height:auto;margin:auto;cursor:crosshair}.browserSide{min-height:0;overflow:auto;border:1px solid var(--line);border-radius:22px;background:rgba(255,255,255,.045);padding:10px}.browserSide h3{font-size:13px;margin:5px 4px 9px;color:#eafcff}.cmdBox{display:flex;gap:7px;margin-bottom:9px}.cmdBox input{flex:1;border:1px solid var(--line);border-radius:14px;background:rgba(8,10,27,.56);color:var(--text);padding:10px;outline:none}.noteBox,.analysisBox{font-size:12px;line-height:1.9;color:var(--muted);border:1px solid var(--line);background:rgba(255,255,255,.055);border-radius:16px;padding:9px;margin-bottom:9px;white-space:pre-wrap}.analysisBox{color:#e9fff9;border-color:rgba(45,212,191,.28);background:rgba(20,184,166,.08)}.elem{border:1px solid var(--line);border-radius:16px;padding:9px;margin:7px 0;background:rgba(255,255,255,.055)}.elemTop{display:flex;gap:7px;align-items:flex-start}.num{min-width:26px;height:26px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(34,211,238,.16);color:#a5f3fc;font-weight:950}.elemText{flex:1;font-size:11.5px;line-height:1.7;color:var(--muted);word-break:break-word}.elemActions{display:flex;gap:6px;margin-top:8px}.mini{border:1px solid var(--line);background:rgba(255,255,255,.07);color:var(--text);border-radius:11px;padding:6px 8px;font-size:11px}.brStatus{font-size:11px;color:var(--muted2);min-height:16px}.browserEmpty{margin:auto;text-align:center;color:var(--muted);padding:22px}.browserEmpty .globe{font-size:42px;margin-bottom:10px}
+
 @media(max-width:760px){.app{padding:7px}.top{height:64px;gap:5px;padding:8px;border-radius:20px}.side{display:none;position:fixed;top:75px;right:8px;bottom:8px;width:min(86vw,340px);z-index:30;border:1px solid var(--line);box-shadow:-24px 0 70px rgba(0,0,0,.45)}.side.open{display:flex}.brand{font-size:0}.brand:before{font-size:18px;margin:0}.top select{min-width:0;max-width:none;flex:1;font-size:11px;padding:9px 7px}.toggle{padding:8px 9px;font-size:11px}.icon{padding:8px 10px}.main{padding-top:7px}.chat{border-radius:20px}.msgs{padding:14px}.msg{max-width:96%;gap:8px}.av{width:32px;height:32px;border-radius:13px;font-size:12px}.bubble{font-size:13px;border-radius:19px}.foot{padding:9px}.card{padding:18px;border-radius:24px}.tabs{margin:14px 0}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+@media(max-width:900px){.browserBody{grid-template-columns:1fr}.browserSide{max-height:38dvh}.browserBar{gap:6px}.brUrl{min-width:160px}.shotWrap{min-height:310px}}
+@media(max-width:760px){.browserBody{padding:8px}.browserPane{border-radius:22px}.browserBar{padding:9px}.brBtn{padding:9px 10px}.browserSide{max-height:42dvh}.cmdBox{flex-direction:column}.shotWrap:before{font-size:10px;right:8px;top:8px}.brUrl{width:100%;flex-basis:100%}}
+
 </style>
 </head>
 <body>
@@ -102,20 +108,47 @@ h1{font-size:24px;margin-top:12px;letter-spacing:-.4px}.sub{font-size:12.5px;col
     </select>
     <button class="toggle" id="searchBtn" onclick="toggleSearch()">🔍 سرچ</button>
     <button class="toggle" id="fallbackBtn" onclick="toggleFallback()">Fallback خاموش</button>
+    <button class="toggle" id="browserBtn" onclick="toggleBrowser()">🌐 مرورگر</button>
     <div class="spacer"></div>
     <button class="icon" onclick="showSetup()">⚙️</button>
   </div>
   <div class="main">
     <aside class="side" id="side"><div class="sidehead"><span>تاریخچه</span><button class="new" onclick="newSession()">+ جدید</button></div><div class="sessions" id="sessions"></div></aside>
-    <section class="chat"><div class="msgs" id="msgs"></div>
+    <section class="chat" id="chatPane"><div class="msgs" id="msgs"></div>
       <div class="foot"><div class="tools"><button class="toggle" onclick="document.getElementById('file').click()">🖼️ عکس</button><input type="file" id="file" accept="image/*" multiple onchange="addImages(this)"></div><div class="preview" id="preview"></div><div class="row"><textarea id="prompt" rows="1" placeholder="پیامت را بنویس..." oninput="autoResize(this)" onkeydown="onKey(event)"></textarea><button class="cancel" id="cancel" onclick="cancelReq()">×</button><button class="send" id="send" onclick="sendMsg()">➤</button></div><div class="status" id="status">آماده</div></div>
+    </section>
+    <section class="browserPane hidden" id="browserPane">
+      <div class="browserBar">
+        <input class="brUrl" id="br-url" placeholder="https://example.com" onkeydown="if(event.key==='Enter')browserOpen()">
+        <button class="brBtn primary" onclick="browserOpen()">برو</button>
+        <button class="brBtn" onclick="browserAct('back')">← برگشت</button>
+        <button class="brBtn" onclick="browserAct('reload')">↻ رفرش</button>
+        <button class="brBtn" onclick="browserAct('scroll',{dy:760})">↓ اسکرول</button>
+        <button class="brBtn" onclick="browserAct('scroll',{dy:-760})">↑ بالا</button>
+      </div>
+      <div class="browserBody">
+        <div class="browserView">
+          <div class="brInfo"><span class="brPill" id="br-title">مرورگر ریموت آماده است</span><span class="brPill" id="br-current-url">هنوز صفحه‌ای باز نشده</span><span class="brStatus" id="br-status">آماده</span></div>
+          <div class="shotWrap" id="shotWrap"><div class="browserEmpty" id="br-empty"><div class="globe">🌐</div><div>URL را وارد کن یا دستور بده؛ Chromium داخل GitHub Actions اجرا می‌شود.</div></div><img id="br-shot" alt="Remote browser screenshot" style="display:none" onclick="browserClickShot(event)"></div>
+        </div>
+        <aside class="browserSide">
+          <h3>دستور مرورگر</h3>
+          <div class="cmdBox"><input id="br-cmd" placeholder="مثلا: روی لینک 3 کلیک کن، یا این صفحه را تحلیل کن" onkeydown="if(event.key==='Enter')browserCommand()"><button class="mini" onclick="browserCommand()">اجرا</button></div>
+          <button class="mini" onclick="browserAnalyze()">تحلیل AI صفحه</button>
+          <div class="noteBox" id="br-note">برای کلیک، هم می‌توانی روی عکس بزنی هم از لیست عناصر پایین استفاده کنی.</div>
+          <div class="analysisBox" id="br-analysis" style="display:none"></div>
+          <h3>لینک‌ها و دکمه‌های قابل کلیک</h3>
+          <div id="br-elems"><div class="hint">بعد از باز شدن صفحه، عناصر اینجا می‌آیند.</div></div>
+        </aside>
+      </div>
     </section>
   </div>
 </div>
 
 <script>
-const CK='aip_cfg_v1', SK='aip_sessions_v1', AK='aip_active_v1';
+const CK='aip_cfg_v1', SK='aip_sessions_v1', AK='aip_active_v1', BK='aip_browser_v1';
 let cfg={}, sessions={}, active=null, loading=false, cancelled=false, doSearch=false, useFallback=false, pendImgs=[];
+let browserMode=false, browserLoading=false, browserState={sid:'b'+uid(),last:null};
 const GH='https://api.github.com';
 
 function $(id){return document.getElementById(id)}
@@ -135,6 +168,7 @@ function init(){
   try{cfg=JSON.parse(localStorage.getItem(CK)||'{}')}catch(e){cfg={}}
   if(cfg.user&&cfg.repo&&cfg.token)$('setup').style.display='none';
   try{sessions=JSON.parse(localStorage.getItem(SK)||'{}')}catch(e){sessions={}}
+  try{const bs=JSON.parse(localStorage.getItem(BK)||'{}'); if(bs&&bs.sid)browserState=bs}catch(e){}
   renderSessions(); const last=localStorage.getItem(AK); if(last&&sessions[last])loadSession(last); else newSession();
 }
 
@@ -257,6 +291,40 @@ async function pollResponse(id){
   const path=`queue/response_${id}.json`; const deadline=Date.now()+240000; let n=0;
   while(Date.now()<deadline){if(cancelled)throw new Error('cancelled');await sleep(3500);setStatus('در حال بررسی پاسخ... '+(++n));const res=await ghGet(path).catch(e=>null);if(res&&res.data){const obj=await decryptObj(res.data);ghDel(path,res.sha);return obj}}
   throw new Error('timeout؛ آیا workflow در Actions اجراست؟')
+}
+
+
+// ── Remote Browser mode ──
+function saveBrowserState(){try{localStorage.setItem(BK,JSON.stringify({sid:browserState.sid,last:browserState.last}))}catch(e){}}
+function toggleBrowser(force){browserMode=typeof force==='boolean'?force:!browserMode;$('browserBtn').classList.toggle('on',browserMode);$('browserBtn').textContent=browserMode?'💬 چت':'🌐 مرورگر';$('chatPane').classList.toggle('hidden',browserMode);$('browserPane').classList.toggle('hidden',!browserMode)}
+function setBrowserLoading(v){browserLoading=v;$('br-status').textContent=v?'در حال اجرای مرورگر در Actions...':'آماده';Array.from(document.querySelectorAll('.brBtn,.browserSide .mini')).forEach(b=>b.disabled=v)}
+function setBrowserStatus(s){$('br-status').textContent=s}
+async function browserAct(action,extra={}){
+  if(browserLoading)return; if(!cfg.user||!cfg.repo||!cfg.token)return showSetup(); toggleBrowser(true); setBrowserLoading(true);
+  try{
+    const [provider,model]=$('model').value.split('|'); const id='br_'+uid();
+    const payload=Object.assign({id,type:'browser',browser_session:browserState.sid,action,provider,model},extra||{});
+    const envelope=await encryptObj(payload); await ghPut(`queue/prompt_${id}.json`,envelope,null);
+    setBrowserStatus('منتظر پاسخ Actions...'); const out=await pollResponse(id);
+    if(out?.browser)renderBrowser(out.browser);
+    if(out?.error){const msg=out.error.message||JSON.stringify(out.error);$('br-note').textContent=(out.browser?.note?out.browser.note+'\n':'')+'❌ '+msg;}
+  }catch(e){$('br-note').textContent='❌ '+(e.message||e);setBrowserStatus('خطا')}
+  finally{setBrowserLoading(false)}
+}
+function browserOpen(){const url=$('br-url').value.trim(); if(!url)return alert('URL را وارد کن'); browserAct('open',{url})}
+function browserCommand(){const command=$('br-cmd').value.trim(); if(!command)return; browserAct('command',{command})}
+function browserAnalyze(){const command=$('br-cmd').value.trim()||'این صفحه را خلاصه و تحلیل کن'; browserAct('analyze',{command})}
+function browserClickIndex(i){browserAct('click_index',{index:i})}
+function browserTypeIndex(i){const text=window.prompt('متنی که باید وارد شود:'); if(text!==null&&text!=='')browserAct('type_index',{index:i,text})}
+function browserClickShot(ev){if(browserLoading)return; const img=$('br-shot'); if(!img.src)return; const r=img.getBoundingClientRect(); const x=Math.round((ev.clientX-r.left)*(img.naturalWidth/r.width)); const y=Math.round((ev.clientY-r.top)*(img.naturalHeight/r.height)); browserAct('click_xy',{x,y})}
+function renderBrowser(b){
+  browserState.last=b; saveBrowserState();
+  $('br-empty').style.display='none'; const img=$('br-shot'); img.style.display='block'; img.src=b.screenshot||'';
+  $('br-title').textContent=b.title||'بدون عنوان'; $('br-current-url').textContent=b.url||''; if(b.url)$('br-url').value=b.url;
+  $('br-note').textContent=b.note||'وضعیت صفحه دریافت شد.';
+  if(b.analysis){$('br-analysis').style.display='block';$('br-analysis').textContent=b.analysis}else{$('br-analysis').style.display='none';$('br-analysis').textContent=''}
+  const els=(b.elements||[]).slice(0,60);
+  $('br-elems').innerHTML=els.length?els.map(e=>`<div class="elem"><div class="elemTop"><div class="num">${e.index}</div><div class="elemText"><strong>${esc(e.tag||'el')}</strong> · ${esc(e.text||e.href||'بدون متن')} ${e.href?`<br><span class="hint">${esc(e.href)}</span>`:''}</div></div><div class="elemActions"><button class="mini" onclick="browserClickIndex(${e.index})">کلیک</button>${['input','textarea','select'].includes(e.tag)||e.type?`<button class="mini" onclick="browserTypeIndex(${e.index})">تایپ</button>`:''}</div></div>`).join(''):'<div class="hint">عنصر قابل کلیک در viewport فعلی پیدا نشد. اسکرول یا رفرش کن.</div>';
 }
 
 init();

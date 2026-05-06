@@ -5,6 +5,8 @@ import re
 import time
 import traceback
 import urllib.parse
+import ipaddress
+import socket
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
@@ -573,7 +575,386 @@ def fallback_chain(primary_provider: str, primary_model: str) -> List[Tuple[str,
     return chain
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Remote Browser Agent (Playwright inside GitHub Actions)
+# ─────────────────────────────────────────────────────────────────────────────
+_pw = None
+_browser = None
+BROWSER_SESSIONS: Dict[str, Dict[str, Any]] = {}
+
+
+def _fa_digits_to_en(text: str) -> str:
+    table = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+    return str(text or "").translate(table)
+
+
+def _safe_url(url: str) -> str:
+    url = (url or "").strip()
+    if not url:
+        raise RuntimeError("URL خالی است.")
+    if not re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", url):
+        url = "https://" + url
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise RuntimeError("فقط URLهای http/https مجاز هستند.")
+    host = parsed.hostname or ""
+    if not host:
+        raise RuntimeError("URL نامعتبر است.")
+    if host.lower() in ("localhost", "localtest.me") or host.endswith(".local"):
+        raise RuntimeError("باز کردن آدرس‌های local مجاز نیست.")
+    try:
+        ips = [x[4][0] for x in socket.getaddrinfo(host, None)]
+        for ip in ips:
+            addr = ipaddress.ip_address(ip)
+            if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_multicast or addr.is_reserved:
+                raise RuntimeError("برای امنیت، آدرس‌های شبکه خصوصی/داخلی باز نمی‌شوند.")
+    except RuntimeError:
+        raise
+    except Exception:
+        pass
+    return urllib.parse.urlunparse(parsed)
+
+
+def _ensure_browser():
+    global _pw, _browser
+    if _browser is not None:
+        return _browser
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as e:
+        raise RuntimeError("Playwright نصب نیست. workflow را با dependency جدید اجرا کن: pip install playwright و python -m playwright install chromium") from e
+    _pw = sync_playwright().start()
+    _browser = _pw.chromium.launch(
+        headless=True,
+        args=[
+            "--disable-dev-shm-usage",
+            "--no-sandbox",
+            "--disable-blink-features=AutomationControlled",
+        ],
+    )
+    return _browser
+
+
+def _get_browser_session(sid: str) -> Dict[str, Any]:
+    sid = sid or "default"
+    sess = BROWSER_SESSIONS.get(sid)
+    if sess and sess.get("page"):
+        return sess
+    browser = _ensure_browser()
+    context = browser.new_context(
+        viewport={"width": 1280, "height": 900},
+        device_scale_factor=1,
+        locale="fa-IR",
+        timezone_id="Asia/Tehran",
+        ignore_https_errors=True,
+        user_agent=(
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        ),
+    )
+    page = context.new_page()
+    page.set_default_timeout(30000)
+    sess = {"sid": sid, "context": context, "page": page, "created": time.time(), "updated": time.time()}
+    BROWSER_SESSIONS[sid] = sess
+    return sess
+
+
+def _visible_elements(page) -> List[Dict[str, Any]]:
+    js = r"""
+    () => {
+      const nodes = Array.from(document.querySelectorAll('a,button,input,textarea,select,[role="button"],[onclick],[tabindex]'));
+      const out = [];
+      const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+      const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+      for (const el of nodes) {
+        const r = el.getBoundingClientRect();
+        const st = window.getComputedStyle(el);
+        if (!r || r.width < 4 || r.height < 4) continue;
+        if (r.bottom < 0 || r.right < 0 || r.top > vh || r.left > vw) continue;
+        if (st.visibility === 'hidden' || st.display === 'none' || Number(st.opacity || '1') < 0.05) continue;
+        const tag = (el.tagName || '').toLowerCase();
+        const role = el.getAttribute('role') || '';
+        const href = el.href || el.getAttribute('href') || '';
+        const type = el.getAttribute('type') || '';
+        const label = el.innerText || el.value || el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('placeholder') || href || tag;
+        out.push({
+          tag, role, type, href,
+          text: String(label || '').replace(/\s+/g,' ').trim().slice(0, 140),
+          x: Math.max(0, Math.round(r.left)), y: Math.max(0, Math.round(r.top)),
+          w: Math.round(r.width), h: Math.round(r.height),
+          cx: Math.round(r.left + r.width/2), cy: Math.round(r.top + r.height/2)
+        });
+        if (out.length >= 80) break;
+      }
+      return out;
+    }
+    """
+    try:
+        els = page.evaluate(js)
+        if isinstance(els, list):
+            for i, e in enumerate(els, 1):
+                e["index"] = i
+            return els
+    except Exception as e:
+        print(f"visible elements error: {e}")
+    return []
+
+
+def _page_text(page, limit: int = 9000) -> str:
+    try:
+        txt = page.evaluate("() => document.body ? document.body.innerText : ''") or ""
+        txt = re.sub(r"\s+", " ", txt).strip()
+        return txt[:limit]
+    except Exception:
+        return ""
+
+
+def _safe_wait(page) -> None:
+    try:
+        page.wait_for_load_state("domcontentloaded", timeout=15000)
+    except Exception:
+        pass
+    try:
+        page.wait_for_load_state("networkidle", timeout=6000)
+    except Exception:
+        pass
+    try:
+        page.wait_for_timeout(600)
+    except Exception:
+        pass
+
+
+def _state_payload(sess: Dict[str, Any], note: str = "", analysis: str = "") -> Dict[str, Any]:
+    page = sess["page"]
+    _safe_wait(page)
+    shot = page.screenshot(type="jpeg", quality=72, full_page=False)
+    b64 = base64.b64encode(shot).decode("ascii")
+    title = ""
+    url = ""
+    try:
+        title = page.title()
+    except Exception:
+        pass
+    try:
+        url = page.url
+    except Exception:
+        pass
+    elements = _visible_elements(page)
+    text = _page_text(page, 7000)
+    return {
+        "browser": {
+            "sid": sess.get("sid", "default"),
+            "url": url,
+            "title": title,
+            "note": note,
+            "analysis": analysis,
+            "screenshot": "data:image/jpeg;base64," + b64,
+            "elements": elements,
+            "text_preview": text,
+            "ts": int(time.time()),
+        },
+        "meta": {"provider": "github-actions", "model": "playwright/chromium", "requested_model": "browser-agent"},
+    }
+
+
+def _element_by_index(page, index: int) -> Optional[Dict[str, Any]]:
+    elements = _visible_elements(page)
+    for e in elements:
+        if int(e.get("index", -1)) == int(index):
+            return e
+    return None
+
+
+def _extract_number(text: str) -> Optional[int]:
+    t = _fa_digits_to_en(text)
+    m = re.search(r"(?:#|شماره|لینک|دکمه|گزینه|click|کلیک)?\s*(\d{1,2})", t, re.I)
+    if m:
+        return int(m.group(1))
+    words = {
+        "اول": 1, "نخست": 1, "یکم": 1,
+        "دوم": 2, "سوم": 3, "چهارم": 4, "پنجم": 5,
+        "ششم": 6, "هفتم": 7, "هشتم": 8, "نهم": 9, "دهم": 10,
+    }
+    for w, n in words.items():
+        if w in text:
+            return n
+    return None
+
+
+def _click_element(page, e: Dict[str, Any]) -> str:
+    page.mouse.click(int(e.get("cx", 0)), int(e.get("cy", 0)))
+    _safe_wait(page)
+    label = e.get("text") or e.get("href") or e.get("tag") or "element"
+    return f"کلیک شد: {label[:80]}"
+
+
+def _type_into_element(page, e: Dict[str, Any], text: str) -> str:
+    page.mouse.click(int(e.get("cx", 0)), int(e.get("cy", 0)))
+    try:
+        page.keyboard.press("Control+A")
+    except Exception:
+        pass
+    page.keyboard.type(text, delay=10)
+    label = e.get("text") or e.get("tag") or "field"
+    return f"متن وارد شد در: {label[:60]}"
+
+
+def _find_element_by_text(page, command: str) -> Optional[Dict[str, Any]]:
+    t = command.strip()
+    needles = []
+    patterns = [
+        r"روی\s+(.{2,60}?)(?:\s+کلیک|\s+بزن|$)",
+        r"(?:دکمه|لینک|گزینه)\s+(.{2,60}?)(?:\s+را|\s+رو|\s+کلیک|\s+بزن|$)",
+        r"click\s+(.{2,60})",
+    ]
+    for pat in patterns:
+        m = re.search(pat, t, re.I)
+        if m:
+            needles.append(m.group(1).strip(" '\"،.؟"))
+    for needle in needles:
+        if not needle:
+            continue
+        for e in _visible_elements(page):
+            hay = (e.get("text") or "") + " " + (e.get("href") or "")
+            if needle.lower() in hay.lower():
+                return e
+    return None
+
+
+def _analyze_page_with_ai(sess: Dict[str, Any], command: str, provider: str, model: str) -> str:
+    page = sess["page"]
+    elements = _visible_elements(page)[:35]
+    element_lines = []
+    for e in elements:
+        element_lines.append(f"{e.get('index')}. {e.get('tag')} {e.get('text','')} {e.get('href','')[:90]}")
+    prompt = (
+        "تو دستیار مرورگر ریموت هستی. کاربر صفحه‌ای را باز کرده و از تو تحلیل/راهنمایی می‌خواهد. "
+        "بر اساس متن صفحه و عناصر قابل کلیک پاسخ بده. اگر باید عملیات بعدی انجام شود، دقیق بگو روی کدام شماره کلیک کند.\n\n"
+        f"URL: {page.url}\nTitle: {page.title()}\n\n"
+        f"درخواست کاربر: {command}\n\n"
+        f"عناصر قابل کلیک:\n" + "\n".join(element_lines) + "\n\n"
+        f"متن صفحه:\n{_page_text(page, 12000)}"
+    )
+    contents = [{"role": "user", "parts": [{"text": prompt}]}]
+    try:
+        res = call_provider(provider, model, contents, max_tokens=900, temperature=0.25, add_reasoning=False)
+        return _extract_text_from_gemini_like(res)[:5000]
+    except Exception as e:
+        return f"تحلیل AI ناموفق بود: {str(e)[:900]}"
+
+
+def run_browser_request(data: Dict[str, Any]) -> Dict[str, Any]:
+    sid = data.get("browser_session") or data.get("sid") or "default"
+    action = (data.get("action") or "state").strip().lower()
+    command = (data.get("command") or "").strip()
+    sess = _get_browser_session(sid)
+    page = sess["page"]
+    note = ""
+    analysis = ""
+
+    try:
+        if action in ("open", "goto"):
+            url = _safe_url(data.get("url") or command)
+            page.goto(url, wait_until="domcontentloaded", timeout=45000)
+            note = "صفحه باز شد."
+        elif action == "click_xy":
+            x = int(float(data.get("x", 0)))
+            y = int(float(data.get("y", 0)))
+            page.mouse.click(x, y)
+            note = f"کلیک روی مختصات {x},{y} انجام شد."
+        elif action == "click_index":
+            idx = int(data.get("index") or _extract_number(command) or 0)
+            e = _element_by_index(page, idx)
+            if not e:
+                raise RuntimeError(f"عنصر شماره {idx} پیدا نشد؛ صفحه را Refresh/State کن.")
+            note = _click_element(page, e)
+        elif action == "type_index":
+            idx = int(data.get("index") or _extract_number(command) or 0)
+            text = data.get("text") or command
+            e = _element_by_index(page, idx)
+            if not e:
+                raise RuntimeError(f"فیلد شماره {idx} پیدا نشد.")
+            note = _type_into_element(page, e, text)
+        elif action == "press":
+            key = data.get("key") or command or "Enter"
+            page.keyboard.press(str(key))
+            note = f"کلید {key} زده شد."
+        elif action == "scroll":
+            dy = int(data.get("dy", 650))
+            page.mouse.wheel(0, dy)
+            note = "اسکرول انجام شد."
+        elif action == "back":
+            page.go_back(wait_until="domcontentloaded", timeout=30000)
+            note = "برگشت انجام شد."
+        elif action == "forward":
+            page.go_forward(wait_until="domcontentloaded", timeout=30000)
+            note = "رفتن به جلو انجام شد."
+        elif action == "reload":
+            page.reload(wait_until="domcontentloaded", timeout=30000)
+            note = "صفحه تازه‌سازی شد."
+        elif action == "analyze":
+            provider = data.get("provider", "github")
+            model = data.get("model", "openai/gpt-4.1-mini")
+            analysis = _analyze_page_with_ai(sess, command or "این صفحه را خلاصه و تحلیل کن", provider, model)
+            note = "تحلیل صفحه آماده شد."
+        elif action == "command":
+            raw = _fa_digits_to_en(command)
+            url_match = re.search(r"https?://[^\s]+|(?:[\w-]+\.)+[a-zA-Z]{2,}(?:/[^\s]*)?", raw)
+            if url_match and any(w in command.lower() for w in ("برو", "باز", "open", "go", "goto")):
+                url = _safe_url(url_match.group(0))
+                page.goto(url, wait_until="domcontentloaded", timeout=45000)
+                note = "صفحه باز شد."
+            elif any(w in command for w in ("برگرد", "قبلی", "back")):
+                page.go_back(wait_until="domcontentloaded", timeout=30000)
+                note = "برگشت انجام شد."
+            elif any(w in command for w in ("رفرش", "تازه", "reload", "refresh")):
+                page.reload(wait_until="domcontentloaded", timeout=30000)
+                note = "صفحه تازه‌سازی شد."
+            elif any(w in command for w in ("اسکرول پایین", "پایین", "scroll down")):
+                page.mouse.wheel(0, 750)
+                note = "اسکرول پایین انجام شد."
+            elif any(w in command for w in ("اسکرول بالا", "بالا", "scroll up")):
+                page.mouse.wheel(0, -750)
+                note = "اسکرول بالا انجام شد."
+            elif ("کلیک" in command or "بزن" in command or "click" in command.lower()) and _extract_number(command):
+                idx = int(_extract_number(command) or 0)
+                e = _element_by_index(page, idx)
+                if not e:
+                    raise RuntimeError(f"عنصر شماره {idx} پیدا نشد.")
+                note = _click_element(page, e)
+            elif "تایپ" in command or "type" in command.lower():
+                idx = _extract_number(command)
+                if not idx:
+                    raise RuntimeError("برای تایپ بگو داخل شماره چند تایپ کنم؛ مثلا: تایپ 4 سلام")
+                text = re.sub(r".*?(?:تایپ|type)\s*\d*\s*[:：-]?\s*", "", command, flags=re.I).strip()
+                e = _element_by_index(page, int(idx))
+                if not e:
+                    raise RuntimeError(f"فیلد شماره {idx} پیدا نشد.")
+                note = _type_into_element(page, e, text)
+            elif ("کلیک" in command or "بزن" in command or "click" in command.lower()) and _find_element_by_text(page, command):
+                note = _click_element(page, _find_element_by_text(page, command) or {})
+            else:
+                provider = data.get("provider", "github")
+                model = data.get("model", "openai/gpt-4.1-mini")
+                analysis = _analyze_page_with_ai(sess, command or "این صفحه را بررسی کن", provider, model)
+                note = "دستور به عنوان تحلیل صفحه اجرا شد."
+        else:
+            note = "وضعیت فعلی صفحه گرفته شد."
+
+        sess["updated"] = time.time()
+        return _state_payload(sess, note=note, analysis=analysis)
+    except Exception as e:
+        try:
+            state = _state_payload(sess, note=f"خطای مرورگر: {str(e)[:900]}")
+            state["error"] = {"code": 500, "message": str(e)}
+            return state
+        except Exception:
+            return {"error": {"code": 500, "message": str(e)}}
+
 def run_request(data: Dict[str, Any]) -> Dict[str, Any]:
+    if data.get("type") == "browser":
+        return run_browser_request(data)
+
     provider = data.get("provider", "github")
     model = data.get("model", "openai/gpt-4.1-mini")
     use_search = bool(data.get("use_search", False))
@@ -654,7 +1035,7 @@ def process_prompt_file(path: str, sha: str) -> None:
 
 
 def main() -> None:
-    print("AI proxy started: GitHub Models + Hugging Face Router + OpenRouter + Groq + Gemini + xAI + Puter")
+    print("AI proxy started: AI providers + Playwright remote browser")
     print("Queue encryption:", "ON" if CHAT_QUEUE_KEY else "OFF - add CHAT_QUEUE_KEY for public repos")
     processed = set()
     while True:
