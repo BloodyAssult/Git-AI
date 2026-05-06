@@ -24,7 +24,7 @@ BASE = "https://api.github.com"
 QUEUE_DIR = os.environ.get("WORKER_QUEUE_DIR", "browser_queue").strip("/") or "browser_queue"
 POLL_SECONDS = float(os.environ.get("WORKER_POLL_SECONDS", "1.2"))
 HEARTBEAT_SECONDS = float(os.environ.get("WORKER_HEARTBEAT_SECONDS", "8"))
-WORKER_PROTOCOL_VERSION = "2026-05-06-lowdata-v2"
+WORKER_PROTOCOL_VERSION = "2026-05-06-lowdata-v3"
 WORKER_STARTED_AT = time.time()
 PROCESSED_COUNT = 0
 
@@ -166,10 +166,39 @@ def write_worker_status(extra: Optional[Dict[str, Any]] = None) -> None:
     except Exception as e:
         print(f"[worker] heartbeat failed: {e}", flush=True)
 
+
+def write_worker_log(level: str, message: str, extra: Optional[Dict[str, Any]] = None) -> None:
+    """Append a clear-text diagnostic event for the web UI."""
+    try:
+        log_path = f"{QUEUE_DIR}/worker_log.json"
+        old, old_sha = proxy.get_file(log_path)
+        if not isinstance(old, dict):
+            old = {"version": WORKER_PROTOCOL_VERSION, "events": []}
+        events = old.get("events") if isinstance(old.get("events"), list) else []
+        ev: Dict[str, Any] = {
+            "ts": time.time(),
+            "level": level,
+            "message": message,
+            "version": WORKER_PROTOCOL_VERSION,
+            "codespace": os.environ.get("CODESPACE_NAME") or os.environ.get("HOSTNAME") or "codespace",
+            "pid": os.getpid(),
+            "repo": REPO,
+            "processed_count": PROCESSED_COUNT,
+        }
+        if extra:
+            ev.update(extra)
+        events.append(ev)
+        old.update({"version": WORKER_PROTOCOL_VERSION, "updated_at": time.time(), "events": events[-120:]})
+        proxy.put_file(log_path, old, old_sha)
+        print(f"[worker-log] {level}: {message}", flush=True)
+    except Exception as e:
+        print(f"[worker-log] failed: {e}", flush=True)
+
 def process_prompt_file(path: str, sha: str) -> None:
     global PROCESSED_COUNT
     req_id = id_from_prompt_path(path)
     print(f"[worker] processing {path} req_id={req_id}", flush=True)
+    write_worker_log("info", f"processing {req_id}", {"request_id": req_id, "path": path})
     write_worker_status({"state": "processing", "request_id": req_id, "message": f"processing {req_id}"})
     current_sha: Optional[str] = sha
     try:
@@ -202,9 +231,11 @@ def process_prompt_file(path: str, sha: str) -> None:
             proxy.delete_file(path, current_sha)
         PROCESSED_COUNT += 1
         write_worker_status({"state": "idle", "last_request_id": req_id, "last_done": time.time(), "message": f"done {req_id}"})
+        write_worker_log("info", f"done {req_id}", {"request_id": req_id})
         print(f"[worker] done req_id={req_id}", flush=True)
     except Exception as e:
         print(f"[worker] error: {e}", flush=True)
+        write_worker_log("error", str(e), {"request_id": req_id, "trace": traceback.format_exc()[-1600:]})
         traceback.print_exc()
         write_response(req_id, {"error": {"code": 500, "message": str(e), "trace": traceback.format_exc()[-1800:]}})
         write_worker_status({"ok": False, "state": "error", "request_id": req_id, "message": str(e)[:260]})
@@ -219,6 +250,7 @@ def main() -> None:
     processed = set()
     last_heartbeat = 0.0
     write_worker_status({"state": "started", "message": "codespace_worker.py started"})
+    write_worker_log("info", "codespace_worker.py started", {"started_at": WORKER_STARTED_AT})
     while True:
         try:
             files = list_worker_files()
@@ -243,6 +275,7 @@ def main() -> None:
             return
         except Exception as e:
             print(f"[worker] loop error: {e}", flush=True)
+            write_worker_log("error", "loop error: "+str(e), {"trace": traceback.format_exc()[-1600:]})
             traceback.print_exc()
         time.sleep(POLL_SECONDS)
 

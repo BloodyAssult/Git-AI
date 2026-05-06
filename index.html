@@ -37,7 +37,7 @@ h1{font-size:24px;margin-top:12px;letter-spacing:-.4px}.sub{font-size:12.5px;col
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 
 .brClip{display:none;position:absolute;left:12px;top:10px;z-index:3;color:#dffcff;font-size:11px;background:rgba(3,8,23,.58);border:1px solid rgba(34,211,238,.28);border-radius:999px;padding:6px 10px;backdrop-filter:blur(10px);box-shadow:0 10px 28px rgba(0,0,0,.22);pointer-events:none}.brClip.on{display:block}.brFullBtn{position:absolute;left:12px;bottom:12px;z-index:4;border:1px solid rgba(255,255,255,.18);border-radius:14px;background:rgba(3,8,23,.58);color:#e6fbff;padding:9px 12px;font-weight:950;font-size:12px;backdrop-filter:blur(12px);box-shadow:0 14px 36px rgba(0,0,0,.28)}.brFullBtn:hover{background:rgba(34,211,238,.16);border-color:rgba(34,211,238,.36)}.shotWrap.shotFull,#shotWrap:fullscreen{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;z-index:120!important;border-radius:0!important;border:0!important;background:#020617!important;display:flex!important;align-items:center!important;justify-content:center!important;overflow:auto!important;padding:10px!important}.shotWrap.shotFull:before,#shotWrap:fullscreen:before{top:14px;right:14px}.shotWrap.shotFull img,#shotWrap:fullscreen img{max-width:100%!important;max-height:100%!important;width:auto!important;height:auto!important;object-fit:contain!important}.shotWrap.shotFull .brFullBtn,#shotWrap:fullscreen .brFullBtn{left:16px;bottom:16px;background:rgba(15,23,42,.82);font-size:13px;padding:11px 14px}
-.csDot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted2);margin-left:6px;vertical-align:middle}.csDot.ok{background:var(--green);box-shadow:0 0 16px rgba(52,211,153,.55)}.csDot.warn{background:var(--amber);box-shadow:0 0 16px rgba(251,191,36,.45)}.csDot.bad{background:var(--red);box-shadow:0 0 16px rgba(251,113,133,.45)}.workerPanel{border:1px solid rgba(34,211,238,.22);background:rgba(34,211,238,.055);border-radius:16px;padding:9px;margin:8px 0 9px;font-size:11.5px;line-height:1.85;color:var(--muted)}.workerPanel strong{color:#eafcff}.workerRow{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.mini.danger{border-color:rgba(251,113,133,.28);background:rgba(251,113,133,.10);color:#ffdbe2}.mini.good{border-color:rgba(52,211,153,.28);background:rgba(52,211,153,.10);color:#d7fff0}
+.csDot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted2);margin-left:6px;vertical-align:middle}.csDot.ok{background:var(--green);box-shadow:0 0 16px rgba(52,211,153,.55)}.csDot.warn{background:var(--amber);box-shadow:0 0 16px rgba(251,191,36,.45)}.csDot.bad{background:var(--red);box-shadow:0 0 16px rgba(251,113,133,.45)}.workerPanel{border:1px solid rgba(34,211,238,.22);background:rgba(34,211,238,.055);border-radius:16px;padding:9px;margin:8px 0 9px;font-size:11.5px;line-height:1.85;color:var(--muted)}.workerPanel strong{color:#eafcff}.workerRow{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.mini.danger{border-color:rgba(251,113,133,.28);background:rgba(251,113,133,.10);color:#ffdbe2}.mini.good{border-color:rgba(52,211,153,.28);background:rgba(52,211,153,.10);color:#d7fff0}.workerLog{display:none;margin-top:8px;padding:8px;border-radius:12px;background:rgba(0,0,0,.25);border:1px solid rgba(148,163,184,.18);color:#d8f6ff;max-height:190px;overflow:auto;white-space:pre-wrap;direction:ltr;text-align:left;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px}.workerLog.on{display:block}.mini.warn{border-color:rgba(251,191,36,.28);background:rgba(251,191,36,.10);color:#fff3c4}
 @media(max-width:900px){.browserBody{grid-template-columns:1fr}.browserSide{max-height:38dvh}.browserBar{gap:6px}.brUrl{min-width:160px}.shotWrap{min-height:310px}}
 @media(max-width:760px){.browserBody{padding:8px}.browserPane{border-radius:22px}.browserBar{padding:9px}.brBtn{padding:9px 10px}.browserSide{max-height:42dvh}.cmdBox{flex-direction:column}.shotWrap:before{font-size:10px;right:8px;top:8px}.brUrl{width:100%;flex-basis:100%}}
 
@@ -145,7 +145,7 @@ h1{font-size:24px;margin-top:12px;letter-spacing:-.4px}.sub{font-size:12.5px;col
           <h3>دستور مرورگر</h3>
           <div class="cmdBox"><input id="br-cmd" placeholder="مثلا: روی لینک 3 کلیک کن، یا این صفحه را تحلیل کن" onkeydown="if(event.key==='Enter')browserCommand()"><button class="mini" onclick="browserCommand()">اجرا</button></div>
           <button class="mini" onclick="browserAnalyze()">تحلیل AI صفحه</button>
-          <div class="workerPanel" id="worker-panel"><strong>Low‑Data Worker</strong><br><span id="worker-detail">برای حذف مصرف سنگین VS Code Web، Codespace را از همین‌جا روشن/خاموش کن.</span><div class="workerRow"><button class="mini good" onclick="startCodespaceWorker()">روشن کردن</button><button class="mini" onclick="refreshWorkerStatus(true)">وضعیت</button><button class="mini danger" onclick="stopCodespaceWorker()">خاموش کردن</button></div></div>
+          <div class="workerPanel" id="worker-panel"><strong>Low‑Data Worker</strong><br><span id="worker-detail">برای حذف مصرف سنگین VS Code Web، Codespace را از همین‌جا روشن/خاموش کن.</span><div class="workerRow"><button class="mini good" onclick="startCodespaceWorker()">روشن کردن</button><button class="mini" onclick="refreshWorkerStatus(true)">وضعیت</button><button class="mini" onclick="toggleWorkerLog()">لاگ</button><button class="mini warn" onclick="resetCodespaceFresh()" title="Codespace قدیمی را حذف و از آخرین نسخه repo یک Codespace تازه می‌سازد">ساخت تازه</button><button class="mini danger" onclick="stopCodespaceWorker()">خاموش کردن</button></div><pre class="workerLog" id="worker-log">لاگی بارگذاری نشده است.</pre></div>
           <div class="noteBox" id="br-note">برای کلیک، هم می‌توانی روی عکس بزنی هم از لیست عناصر پایین استفاده کنی.</div>
           <div class="analysisBox" id="br-analysis" style="display:none"></div>
           <h3>لینک‌ها و دکمه‌های قابل کلیک</h3>
@@ -163,7 +163,7 @@ let browserMode=false, browserLoading=false, browserBackend=localStorage.getItem
 let codespaceName=localStorage.getItem(CSK)||'', codespaceBusy=false, csStatusTimer=null;
 let brFrameTimer=null;
 let proxyWakeAt=0, proxyDefaultBranch=null;
-const WORKER_PROTOCOL_VERSION='2026-05-06-lowdata-v2';
+const WORKER_PROTOCOL_VERSION='2026-05-06-lowdata-v3';
 const GH='https://api.github.com';
 if(window.marked){marked.setOptions({gfm:true,breaks:true,mangle:false,headerIds:false});}
 
@@ -310,6 +310,75 @@ async function refreshWorkerStatus(manual=false){
     if(manual)setBrowserStatus(st?workerStatusText(st):'هنوز heartbeat از Worker پیدا نشد. اگر Codespace را قبل از این نسخه ساخته‌ای، یک‌بار Rebuild یا Codespace تازه بساز.');
     return st;
   }catch(e){if(manual)setBrowserStatus('خطا در خواندن وضعیت Worker: '+e.message);return null}
+}
+
+async function readWorkerLog(){
+  try{const res=await ghGet('browser_queue/worker_log.json');return res&&res.data?res.data:null}catch(e){return null}
+}
+function formatWorkerLog(data){
+  const events=Array.isArray(data?.events)?data.events:[];
+  if(!events.length)return 'هنوز لاگی از Worker ثبت نشده است. اگر Codespace قدیمی است، «ساخت تازه» را بزن.';
+  return events.slice(-50).map(ev=>{
+    const d=new Date(Number(ev.ts||0)*1000);
+    const time=Number.isFinite(d.getTime())?d.toLocaleTimeString('fa-IR'):'--:--';
+    const lvl=(ev.level||'info').toUpperCase();
+    const msg=String(ev.message||'').replace(/\n/g,' ');
+    const extra=ev.request_id?` req=${ev.request_id}`:'';
+    return `[${time}] ${lvl}${extra} ${msg}`;
+  }).join('\n');
+}
+async function toggleWorkerLog(forceOpen){
+  const box=$('worker-log'); if(!box)return;
+  const open=typeof forceOpen==='boolean'?forceOpen:!box.classList.contains('on');
+  box.classList.toggle('on',open);
+  if(!open)return;
+  box.textContent='در حال خواندن لاگ Worker...';
+  const log=await readWorkerLog();
+  box.textContent=formatWorkerLog(log);
+}
+async function clearWorkerDiagFiles(){
+  for(const path of ['browser_queue/worker_status.json','browser_queue/worker_log.json']){
+    try{const f=await ghGet(path); if(f&&f.sha)await ghDel(path,f.sha)}catch(e){}
+  }
+}
+async function createFreshCodespace(){
+  const ref=await getDefaultBranch().catch(()=> 'main');
+  const body={ref,devcontainer_path:'.devcontainer/devcontainer.json',display_name:'Git-AI Worker',idle_timeout_minutes:240};
+  const r=await safeFetch(`${GH}/repos/${cfg.user}/${cfg.repo}/codespaces`,{method:'POST',headers:codespaceHeaders(),body:JSON.stringify(body)});
+  if(![200,201,202].includes(r.status)){const t=await r.text().catch(()=>'');throw new Error('ساخت Codespace ناموفق بود: '+r.status+' '+t.slice(0,200))}
+  const d=await r.json().catch(()=>({}));
+  if(d.name){codespaceName=d.name; localStorage.setItem(CSK,codespaceName)}
+  return d;
+}
+async function resetCodespaceFresh(){
+  if(codespaceBusy)return; if(!cfg.user||!cfg.repo||!cfg.token)return showSetup();
+  const ok=confirm('این کار Codespace انتخاب‌شده را حذف می‌کند و از آخرین نسخه repo یک Codespace تازه می‌سازد. تغییرات commit نشده داخل Codespace حذف می‌شود. ادامه می‌دهی؟');
+  if(!ok)return;
+  codespaceBusy=true; toggleBrowser(true); browserBackend='worker'; localStorage.setItem(BBK,browserBackend); updateBrowserBackendUI();
+  try{
+    setBrowserStatus('در حال پاک‌کردن status/log قدیمی...'); setCodeStatus('Reset Worker...','warn');
+    await clearWorkerDiagFiles();
+    let oldName=codespaceName;
+    if(!oldName){try{const cs=await pickCodespace(); oldName=cs.name}catch(e){}}
+    if(oldName){
+      setBrowserStatus('در حال حذف Codespace قدیمی: '+oldName);
+      try{await codespaceApi(`/user/codespaces/${encodeURIComponent(oldName)}`,{method:'DELETE'}); await sleep(7000)}catch(e){setBrowserStatus('حذف Codespace قدیمی ناموفق/غیرضروری بود: '+e.message)}
+    }
+    setBrowserStatus('در حال ساخت Codespace تازه از آخرین commit repo...');
+    const cs=await createFreshCodespace();
+    setCodeStatus(`Codespace تازه: ${cs.name||codespaceName||'در حال ساخت'} · منتظر start`,'warn');
+    setBrowserStatus('Codespace تازه ساخته شد؛ منتظر اجرای postStartCommand و heartbeat Worker...');
+    for(let i=0;i<60;i++){
+      await sleep(4000);
+      const ws=await refreshWorkerStatus(false);
+      if(ws&&workerStatusFresh(ws)){setBrowserStatus('Worker تازه آماده شد؛ حالا URL بده.'); await toggleWorkerLog(true); return}
+      if(ws&&(ws.state==='error'||ws.state==='missing_key'||ws.ok===false)){await toggleWorkerLog(true); throw new Error(workerStatusText(ws))}
+      setBrowserStatus(`منتظر heartbeat Worker تازه... ${i+1}`);
+    }
+    await toggleWorkerLog(true);
+    throw new Error('Codespace تازه ساخته شد ولی heartbeat نرسید؛ لاگ Worker را ببین. اگر CHAT_QUEUE_KEY در Codespaces Secrets نیست، اضافه کن و دوباره ساخت تازه بزن.');
+  }catch(e){setBrowserStatus('خطا در ساخت تازه: '+e.message);setCodeStatus('Reset Worker خطا داد','bad')}
+  finally{codespaceBusy=false;updateBrowserBackendUI()}
 }
 async function waitForWorkerReady(maxMs=70000){
   const deadline=Date.now()+maxMs; let last=null;
