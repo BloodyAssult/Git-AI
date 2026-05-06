@@ -9,6 +9,7 @@ The GitHub Pages UI writes browser requests to browser_queue/prompt_<id>.json.
 This worker polls that queue, runs Chromium/Playwright inside the Codespace, and
 writes browser_queue/response_<id>.json for the UI to read.
 """
+import hashlib
 import json
 import os
 import re
@@ -120,6 +121,7 @@ def write_worker_status(extra: Optional[Dict[str, Any]] = None) -> None:
     status_path = f"{QUEUE_DIR}/worker_status.json"
     try:
         old_sha = proxy.get_file_sha(status_path)
+        key = os.environ.get("CHAT_QUEUE_KEY", "")
         payload: Dict[str, Any] = {
             "ok": True,
             "state": "idle",
@@ -130,6 +132,9 @@ def write_worker_status(extra: Optional[Dict[str, Any]] = None) -> None:
             "pid": os.getpid(),
             "mode": "codespace-worker-relay",
             "message": "worker alive",
+            "worker_ready": True,
+            "key_hash": hashlib.sha256(key.encode("utf-8")).hexdigest()[:16] if key else "",
+            "version": "lowdata-worker-v3",
         }
         if extra:
             payload.update(extra)
