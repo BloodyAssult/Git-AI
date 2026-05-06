@@ -168,4 +168,48 @@ permissions:
 
 - بعد از هر عمل مرورگر، یک کلیپ کوتاه چندفریمی با JPEG کیفیت بالا تولید می‌شود و UI آن را مثل ویدیوی کوتاه پخش می‌کند؛ آخرین فریم همان وضعیت نهایی صفحه است.
 - رندر پاسخ‌های AI اصلاح شد: Markdown، جدول‌ها، کدبلاک‌ها و فرمول‌های LaTeX با KaTeX/Marked نمایش داده می‌شوند.
+- حالت جدید **Codespace Worker Relay** اضافه شد؛ در این حالت مرورگر پشت‌صحنه داخل Codespace اجرا می‌شود ولی خروجی همچنان از مسیر GitHub.io/GitHub API دیده می‌شود.
 - اگر CDNهای KaTeX یا Marked در دسترس نبودند، fallback داخلی فرمول‌ها را در باکس خواناتر نشان می‌دهد تا خام و به‌هم‌ریخته نمایش داده نشوند.
+
+## Codespace Worker Relay / حالت سریع‌تر بدون دامنه‌ی Codespaces
+
+اگر دامنه‌ی forwarded port خود Codespaces برایت باز نیست، لازم نیست تصویر noVNC یا پورت Codespace را مستقیم ببینی. در این نسخه یک حالت جدید به مرورگر اضافه شده است:
+
+```text
+حالت: Actions  ← اجرای قبلی با GitHub Actions
+حالت: Worker   ← اجرای سریع‌تر با codespace_worker.py پشت‌صحنه
+```
+
+در حالت Worker، همین سایت `github.io` درخواست مرورگر را داخل `browser_queue/prompt_<id>.json` می‌نویسد. اسکریپت `codespace_worker.py` که در Codespace روشن کرده‌ای، آن را می‌خواند، Chromium/Playwright را اجرا می‌کند و پاسخ را در `browser_queue/response_<id>.json` می‌نویسد. بنابراین مرورگر تو فقط به GitHub Pages و GitHub API وصل است؛ نیاز نیست به دامنه‌ی مستقیم Codespace وصل شوی.
+
+### اجرای Worker در Codespace
+
+در Codespace یک ترمینال باز کن و این‌ها را اجرا کن:
+
+```bash
+export GH_TOKEN=ghp_...            # توکن با Contents: Read and write برای همین repo
+export REPO=username/repo          # مثلا ali/Git-AI
+export CHAT_QUEUE_KEY='همان Security Key سایت و Secret'
+
+./scripts/start_codespace_worker.sh
+```
+
+اگر از AvalAI/Hugging Face/OpenRouter برای «تحلیل AI صفحه» داخل Worker استفاده می‌کنی، کلیدهای همان provider را هم در ترمینال Codespace export کن:
+
+```bash
+export AVALAI_API_KEY=...
+export HF_TOKEN=...
+export OPENROUTER_API_KEY=...
+export GEMINI_API_KEY=...
+export GROQ_API_KEY=...
+```
+
+بعد در سایت، تب مرورگر را باز کن و دکمه‌ی `حالت: Actions` را بزن تا به `حالت: Worker` تبدیل شود. از آن به بعد دکمه‌های برو/کلیک/اسکرول/تجدید فریم از Worker جواب می‌گیرند، نه از Actions.
+
+### مزیت‌ها و محدودیت‌ها
+
+- سریع‌تر از Actions است چون مرورگر Chromium داخل Codespace روشن می‌ماند.
+- همچنان از مسیر GitHub.io دیده می‌شود و نیاز به باز بودن `*.app.github.dev` برای تصویر زنده ندارد.
+- لایو واقعی WebSocket/noVNC نیست؛ اما نسبت به Actions startup کمتری دارد و نزدیک‌تر به لایو است.
+- اگر Worker خاموش باشد، سایت روی حالت Worker منتظر می‌ماند و timeout می‌دهد. با زدن دوباره‌ی دکمه می‌توانی به حالت Actions برگردی.
+- برای repo عمومی، `CHAT_QUEUE_KEY` را حتماً بگذار تا درخواست‌ها و پاسخ‌ها رمزنگاری شوند.

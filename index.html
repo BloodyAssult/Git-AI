@@ -31,7 +31,7 @@ h1{font-size:24px;margin-top:12px;letter-spacing:-.4px}.sub{font-size:12.5px;col
 .main{flex:1;display:flex;min-height:0;gap:10px;padding-top:10px}.side{width:280px;border:1px solid var(--line);border-radius:24px;background:linear-gradient(180deg,rgba(255,255,255,.095),rgba(255,255,255,.052));backdrop-filter:blur(22px) saturate(1.2);display:flex;flex-direction:column;box-shadow:0 20px 70px rgba(0,0,0,.22)}.side.hide{display:none}.sidehead{padding:13px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}.sidehead span{font-size:12px;color:var(--muted);font-weight:900}.new{border:1px solid rgba(139,92,246,.35);background:rgba(139,92,246,.14);color:#e8e2ff;border-radius:12px;padding:7px 11px}.sessions{padding:9px;overflow:auto}.si{position:relative;padding:12px;border-radius:17px;margin-bottom:7px;cursor:pointer;color:var(--muted);border:1px solid transparent;transition:.18s ease}.si:hover,.si.on{background:rgba(255,255,255,.085);border-color:rgba(255,255,255,.11);color:var(--text);box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}.si.on{background:linear-gradient(135deg,rgba(139,92,246,.20),rgba(45,212,191,.10))}.si .t{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:24px}.si .d{font-size:10px;color:var(--muted2);margin-top:5px}.del{position:absolute;left:10px;top:9px;background:transparent;border:0;color:var(--muted2);font-size:18px}
 .chat{flex:1;display:flex;flex-direction:column;min-width:0;border:1px solid var(--line);border-radius:24px;background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.028));backdrop-filter:blur(18px);overflow:hidden}.msgs{flex:1;overflow:auto;padding:22px;display:flex;flex-direction:column;gap:15px;scroll-behavior:smooth}.msgs::-webkit-scrollbar,.sessions::-webkit-scrollbar{width:8px}.msgs::-webkit-scrollbar-thumb,.sessions::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:99px}.empty{margin:auto;text-align:center;color:var(--muted);padding:26px;border:1px solid var(--line);border-radius:28px;background:rgba(255,255,255,.055);box-shadow:inset 0 1px 0 rgba(255,255,255,.08);animation:riseIn .45s ease}.empty .big{font-size:56px;margin-bottom:9px;text-shadow:0 0 28px rgba(139,92,246,.45)}.empty h2{font-size:21px;margin-bottom:8px}.msg{display:flex;gap:11px;max-width:86%;align-self:flex-start;animation:riseIn .25s ease}.msg.user{align-self:flex-end;flex-direction:row-reverse}.av{width:36px;height:36px;border-radius:15px;background:linear-gradient(135deg,var(--accent),var(--accent3));display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:900;box-shadow:0 10px 30px rgba(139,92,246,.22)}.msg.user .av{background:linear-gradient(135deg,var(--blue),var(--accent2));box-shadow:0 10px 30px rgba(45,212,191,.18)}.bubble{position:relative;background:linear-gradient(180deg,rgba(255,255,255,.115),rgba(255,255,255,.068));border:1px solid rgba(255,255,255,.14);border-radius:22px;padding:13px 15px;line-height:2;font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere;box-shadow:0 16px 45px rgba(0,0,0,.17),inset 0 1px 0 rgba(255,255,255,.08)}.msg.model .bubble:before{content:"";position:absolute;inset:0;border-radius:inherit;background:radial-gradient(circle at 6% 0,rgba(139,92,246,.12),transparent 30%);pointer-events:none}.msg.user .bubble{background:linear-gradient(135deg,rgba(37,99,235,.45),rgba(45,212,191,.22));border-color:rgba(96,165,250,.24)}.imgs{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px}.imgs img{max-width:168px;max-height:168px;border-radius:16px;border:1px solid var(--line);box-shadow:0 12px 34px rgba(0,0,0,.22)}.meta{font-size:10px;color:#aaa4cc;margin-top:9px;direction:ltr;text-align:left;border-top:1px solid rgba(255,255,255,.08);padding-top:7px}
 .foot{border-top:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.045));padding:12px;flex-shrink:0}.tools{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}.preview{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}.pw{position:relative}.pw img{width:66px;height:66px;object-fit:cover;border-radius:16px;border:1px solid var(--line);box-shadow:0 10px 26px rgba(0,0,0,.18)}.rm{position:absolute;left:-6px;top:-6px;background:var(--red);color:white;border:0;border-radius:99px;width:22px;height:22px}.row{display:flex;gap:9px;align-items:flex-end}textarea{flex:1;resize:none;max-height:170px;background:rgba(8,10,27,.56);color:var(--text);border:1.5px solid var(--line);outline:none;border-radius:22px;padding:13px 15px;line-height:1.85;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}textarea:focus{border-color:rgba(45,212,191,.58);box-shadow:0 0 0 4px rgba(45,212,191,.10)}.send{width:50px;height:50px;border:0;border-radius:19px;background:linear-gradient(135deg,var(--accent2),var(--blue) 48%,var(--accent));color:white;font-size:20px;font-weight:950;box-shadow:0 16px 36px rgba(34,211,238,.26)}.send:disabled{opacity:.55;cursor:not-allowed}.cancel{display:none;width:50px;height:50px;border:1px solid rgba(251,113,133,.36);border-radius:19px;background:rgba(251,113,133,.12);color:#ffb2bd;font-size:19px}.cancel.show{display:block}.status{font-size:11px;color:var(--muted2);text-align:center;margin-top:7px;min-height:16px}#file{display:none}
-.chat.hidden,.browserPane.hidden{display:none!important}.browserPane{flex:1;min-width:0;border:1px solid var(--line);border-radius:24px;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));backdrop-filter:blur(18px);overflow:hidden;display:flex;flex-direction:column}.browserBar{padding:12px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,.045)}.brUrl{flex:1;min-width:220px;border:1px solid var(--line);border-radius:16px;background:rgba(8,10,27,.56);color:var(--text);padding:11px 13px;direction:ltr;outline:none}.brBtn{border:1px solid var(--line);border-radius:15px;background:rgba(255,255,255,.075);color:var(--text);padding:10px 12px;font-weight:900}.brBtn.primary{background:linear-gradient(135deg,var(--accent2),var(--blue));border-color:rgba(34,211,238,.45);color:#04111d}.browserBody{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:10px;padding:12px;overflow:hidden}.browserView{min-width:0;min-height:0;display:flex;flex-direction:column;gap:9px}.brInfo{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:12px}.brPill{border:1px solid var(--line);background:rgba(255,255,255,.06);border-radius:999px;padding:6px 10px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.shotWrap{position:relative;flex:1;min-height:240px;border:1px solid rgba(34,211,238,.22);border-radius:22px;overflow:auto;background:rgba(0,0,0,.22);box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}.shotWrap:before{content:'برای کلیک مستقیم، روی اسکرین‌شات لمس کن';position:absolute;right:12px;top:10px;z-index:1;color:rgba(255,255,255,.68);font-size:11px;background:rgba(0,0,0,.32);border:1px solid rgba(255,255,255,.12);border-radius:99px;padding:5px 9px;pointer-events:none}.shotWrap img{display:block;max-width:100%;height:auto;margin:auto;cursor:crosshair}.browserSide{min-height:0;overflow:auto;border:1px solid var(--line);border-radius:22px;background:rgba(255,255,255,.045);padding:10px}.browserSide h3{font-size:13px;margin:5px 4px 9px;color:#eafcff}.cmdBox{display:flex;gap:7px;margin-bottom:9px}.cmdBox input{flex:1;border:1px solid var(--line);border-radius:14px;background:rgba(8,10,27,.56);color:var(--text);padding:10px;outline:none}.noteBox,.analysisBox{font-size:12px;line-height:1.9;color:var(--muted);border:1px solid var(--line);background:rgba(255,255,255,.055);border-radius:16px;padding:9px;margin-bottom:9px;white-space:pre-wrap}.analysisBox{color:#e9fff9;border-color:rgba(45,212,191,.28);background:rgba(20,184,166,.08)}.elem{border:1px solid var(--line);border-radius:16px;padding:9px;margin:7px 0;background:rgba(255,255,255,.055)}.elemTop{display:flex;gap:7px;align-items:flex-start}.num{min-width:26px;height:26px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(34,211,238,.16);color:#a5f3fc;font-weight:950}.elemText{flex:1;font-size:11.5px;line-height:1.7;color:var(--muted);word-break:break-word}.elemActions{display:flex;gap:6px;margin-top:8px}.mini{border:1px solid var(--line);background:rgba(255,255,255,.07);color:var(--text);border-radius:11px;padding:6px 8px;font-size:11px}.brStatus{font-size:11px;color:var(--muted2);min-height:16px}.browserEmpty{margin:auto;text-align:center;color:var(--muted);padding:22px}.browserEmpty .globe{font-size:42px;margin-bottom:10px}
+.chat.hidden,.browserPane.hidden{display:none!important}.browserPane{flex:1;min-width:0;border:1px solid var(--line);border-radius:24px;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));backdrop-filter:blur(18px);overflow:hidden;display:flex;flex-direction:column}.browserBar{padding:12px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,.045)}.brUrl{flex:1;min-width:220px;border:1px solid var(--line);border-radius:16px;background:rgba(8,10,27,.56);color:var(--text);padding:11px 13px;direction:ltr;outline:none}.brBtn{border:1px solid var(--line);border-radius:15px;background:rgba(255,255,255,.075);color:var(--text);padding:10px 12px;font-weight:900}.brBtn.primary{background:linear-gradient(135deg,var(--accent2),var(--blue));border-color:rgba(34,211,238,.45);color:#04111d}.brBtn.on{background:linear-gradient(135deg,rgba(45,212,191,.95),rgba(99,102,241,.95));border-color:rgba(45,212,191,.55);color:#03121f;box-shadow:0 10px 25px rgba(45,212,191,.12)}.browserBody{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:10px;padding:12px;overflow:hidden}.browserView{min-width:0;min-height:0;display:flex;flex-direction:column;gap:9px}.brInfo{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:12px}.brPill{border:1px solid var(--line);background:rgba(255,255,255,.06);border-radius:999px;padding:6px 10px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.shotWrap{position:relative;flex:1;min-height:240px;border:1px solid rgba(34,211,238,.22);border-radius:22px;overflow:auto;background:rgba(0,0,0,.22);box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}.shotWrap:before{content:'برای کلیک مستقیم، روی اسکرین‌شات لمس کن';position:absolute;right:12px;top:10px;z-index:1;color:rgba(255,255,255,.68);font-size:11px;background:rgba(0,0,0,.32);border:1px solid rgba(255,255,255,.12);border-radius:99px;padding:5px 9px;pointer-events:none}.shotWrap img{display:block;max-width:100%;height:auto;margin:auto;cursor:crosshair}.browserSide{min-height:0;overflow:auto;border:1px solid var(--line);border-radius:22px;background:rgba(255,255,255,.045);padding:10px}.browserSide h3{font-size:13px;margin:5px 4px 9px;color:#eafcff}.cmdBox{display:flex;gap:7px;margin-bottom:9px}.cmdBox input{flex:1;border:1px solid var(--line);border-radius:14px;background:rgba(8,10,27,.56);color:var(--text);padding:10px;outline:none}.noteBox,.analysisBox{font-size:12px;line-height:1.9;color:var(--muted);border:1px solid var(--line);background:rgba(255,255,255,.055);border-radius:16px;padding:9px;margin-bottom:9px;white-space:pre-wrap}.analysisBox{color:#e9fff9;border-color:rgba(45,212,191,.28);background:rgba(20,184,166,.08)}.elem{border:1px solid var(--line);border-radius:16px;padding:9px;margin:7px 0;background:rgba(255,255,255,.055)}.elemTop{display:flex;gap:7px;align-items:flex-start}.num{min-width:26px;height:26px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(34,211,238,.16);color:#a5f3fc;font-weight:950}.elemText{flex:1;font-size:11.5px;line-height:1.7;color:var(--muted);word-break:break-word}.elemActions{display:flex;gap:6px;margin-top:8px}.mini{border:1px solid var(--line);background:rgba(255,255,255,.07);color:var(--text);border-radius:11px;padding:6px 8px;font-size:11px}.brStatus{font-size:11px;color:var(--muted2);min-height:16px}.browserEmpty{margin:auto;text-align:center;color:var(--muted);padding:22px}.browserEmpty .globe{font-size:42px;margin-bottom:10px}
 
 @media(max-width:760px){.app{padding:7px}.top{height:64px;gap:5px;padding:8px;border-radius:20px}.side{display:none;position:fixed;top:75px;right:8px;bottom:8px;width:min(86vw,340px);z-index:30;border:1px solid var(--line);box-shadow:-24px 0 70px rgba(0,0,0,.45)}.side.open{display:flex}.brand{font-size:0}.brand:before{font-size:18px;margin:0}.top select{min-width:0;max-width:none;flex:1;font-size:11px;padding:9px 7px}.toggle{padding:8px 9px;font-size:11px}.icon{padding:8px 10px}.main{padding-top:7px}.chat{border-radius:20px}.msgs{padding:14px}.msg{max-width:96%;gap:8px}.av{width:32px;height:32px;border-radius:13px;font-size:12px}.bubble{font-size:13px;border-radius:19px}.foot{padding:9px}.card{padding:18px;border-radius:24px}.tabs{margin:14px 0}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
@@ -129,13 +129,14 @@ h1{font-size:24px;margin-top:12px;letter-spacing:-.4px}.sub{font-size:12.5px;col
         <button class="brBtn" onclick="browserAct('back')">← برگشت</button>
         <button class="brBtn" onclick="browserAct('reload')">↻ رفرش</button>
         <button class="brBtn" onclick="browserAct('frames')">🎞️ تجدید فریم</button>
+        <button class="brBtn" id="br-backend" onclick="toggleBrowserBackend()" title="Actions یا Codespace Worker">حالت: Actions</button>
         <button class="brBtn" onclick="browserAct('scroll',{dy:760})">↓ اسکرول</button>
         <button class="brBtn" onclick="browserAct('scroll',{dy:-760})">↑ بالا</button>
       </div>
       <div class="browserBody">
         <div class="browserView">
           <div class="brInfo"><span class="brPill" id="br-title">مرورگر ریموت آماده است</span><span class="brPill" id="br-current-url">هنوز صفحه‌ای باز نشده</span><span class="brStatus" id="br-status">آماده</span></div>
-          <div class="shotWrap" id="shotWrap"><div class="brClip" id="br-clip">در حال پخش ۲۵ فریم تازه…</div><button class="brFullBtn" id="br-full" style="display:none" onclick="toggleShotFullscreen(event)" title="بزرگ‌نمایی مرورگر">⛶ بزرگ</button><div class="browserEmpty" id="br-empty"><div class="globe">🌐</div><div>URL را وارد کن یا دستور بده؛ Chromium داخل GitHub Actions اجرا می‌شود.</div></div><img id="br-shot" alt="Remote browser screenshot" style="display:none" onclick="browserClickShot(event)"></div>
+          <div class="shotWrap" id="shotWrap"><div class="brClip" id="br-clip">در حال پخش ۲۵ فریم تازه…</div><button class="brFullBtn" id="br-full" style="display:none" onclick="toggleShotFullscreen(event)" title="بزرگ‌نمایی مرورگر">⛶ بزرگ</button><div class="browserEmpty" id="br-empty"><div class="globe">🌐</div><div>URL را وارد کن یا دستور بده؛ Chromium داخل Actions یا Codespace Worker اجرا می‌شود.</div></div><img id="br-shot" alt="Remote browser screenshot" style="display:none" onclick="browserClickShot(event)"></div>
         </div>
         <aside class="browserSide">
           <h3>دستور مرورگر</h3>
@@ -152,9 +153,9 @@ h1{font-size:24px;margin-top:12px;letter-spacing:-.4px}.sub{font-size:12.5px;col
 </div>
 
 <script>
-const CK='aip_cfg_v1', SK='aip_sessions_v1', AK='aip_active_v1', BK='aip_browser_v1';
+const CK='aip_cfg_v1', SK='aip_sessions_v1', AK='aip_active_v1', BK='aip_browser_v1', BBK='aip_browser_backend_v1';
 let cfg={}, sessions={}, active=null, loading=false, cancelled=false, doSearch=false, useFallback=false, pendImgs=[];
-let browserMode=false, browserLoading=false, browserState={sid:'b'+uid(),last:null};
+let browserMode=false, browserLoading=false, browserBackend=localStorage.getItem(BBK)||'actions', browserState={sid:'b'+uid(),last:null};
 let brFrameTimer=null;
 let proxyWakeAt=0, proxyDefaultBranch=null;
 const GH='https://api.github.com';
@@ -429,15 +430,17 @@ async function sendMsg(){
   finally{if(!cancelled)setLoading(false);ta.focus()}
 }
 async function pollResponse(id,opts={}){
-  const path=`queue/response_${id}.json`;
+  const queueDir=opts.queueDir||'queue';
+  const path=`${queueDir}/response_${id}.json`;
   const deadline=Date.now()+(opts.timeoutMs||600000);
   const isBrowser=!!opts.browser;
+  const isWorker=queueDir==='browser_queue';
   let n=0,lastErr='';
   while(Date.now()<deadline){
     if(cancelled)throw new Error('cancelled');
-    await sleep(opts.pollMs||3500);
+    await sleep(opts.pollMs||(isWorker?1800:3500));
     n++;
-    const base='در حال بررسی پاسخ Actions... '+n;
+    const base=(isWorker?'در حال بررسی پاسخ Worker... ':'در حال بررسی پاسخ Actions... ')+n;
     if(isBrowser)setBrowserStatus(lastErr?base+' · '+lastErr:base); else setStatus(lastErr?base+' · '+lastErr:base);
     try{
       const res=await ghGet(path);
@@ -447,8 +450,7 @@ async function pollResponse(id,opts={}){
       lastErr=((e&&e.message)||String(e)).slice(0,90);
       if(/token|401|403|rate limit|دسترسی/.test(lastErr))throw e;
     }
-    // هر حدود ۲۰ ثانیه وضعیت Action را هم چک کن تا کاربر نداند گیر کرده یا واقعاً در حال اجراست.
-    if(n%6===0){
+    if(!isWorker && n%6===0){
       try{
         const st=await proxyRunStatus();
         const txt=st.text||'';
@@ -458,30 +460,39 @@ async function pollResponse(id,opts={}){
         }
       }catch(e){}
     }
-    if(n===8){try{await wakeProxyLoop()}catch(e){lastErr=((e&&e.message)||String(e)).slice(0,90)}}
+    if(!isWorker && n===8){try{await wakeProxyLoop()}catch(e){lastErr=((e&&e.message)||String(e)).slice(0,90)}}
   }
+  if(isWorker)throw new Error('timeout؛ پاسخ Worker ساخته نشد. در Codespace ترمینال worker را اجرا و CHAT_QUEUE_KEY/GH_TOKEN/REPO را چک کن.');
   throw new Error('timeout؛ پاسخ ساخته نشد. تب Actions را چک کن؛ احتمالاً workflow اجرا نشده، خطا داده یا token دسترسی workflow ندارد.')
 }
 
 
 // ── Remote Browser mode ──
 function saveBrowserState(){try{localStorage.setItem(BK,JSON.stringify({sid:browserState.sid,last:browserState.last}))}catch(e){}}
-function toggleBrowser(force){browserMode=typeof force==='boolean'?force:!browserMode;$('browserBtn').classList.toggle('on',browserMode);$('browserBtn').textContent=browserMode?'💬 چت':'🌐 مرورگر';$('chatPane').classList.toggle('hidden',browserMode);$('browserPane').classList.toggle('hidden',!browserMode)}
-function setBrowserLoading(v){browserLoading=v;$('br-status').textContent=v?'در حال اجرای مرورگر در Actions...':'آماده';if(v){const bc=$('br-clip');bc.classList.remove('on')}Array.from(document.querySelectorAll('.brBtn,.browserSide .mini')).forEach(b=>b.disabled=v)}
+function updateBrowserBackendUI(){const b=$('br-backend');if(!b)return;const worker=browserBackend==='worker';b.classList.toggle('on',worker);b.textContent=worker?'حالت: Worker':'حالت: Actions';b.title=worker?'درخواست‌های مرورگر از browser_queue خوانده می‌شوند؛ codespace_worker.py باید روشن باشد.':'درخواست‌ها با GitHub Actions اجرا می‌شوند.'}
+function toggleBrowserBackend(){browserBackend=browserBackend==='worker'?'actions':'worker';localStorage.setItem(BBK,browserBackend);updateBrowserBackendUI();setBrowserStatus(browserBackend==='worker'?'حالت Worker فعال شد؛ codespace_worker.py را در Codespace اجرا کن.':'حالت Actions فعال شد.');}
+function toggleBrowser(force){browserMode=typeof force==='boolean'?force:!browserMode;$('browserBtn').classList.toggle('on',browserMode);$('browserBtn').textContent=browserMode?'💬 چت':'🌐 مرورگر';$('chatPane').classList.toggle('hidden',browserMode);$('browserPane').classList.toggle('hidden',!browserMode);updateBrowserBackendUI()}
+function setBrowserLoading(v){browserLoading=v;$('br-status').textContent=v?(browserBackend==='worker'?'در حال اجرای مرورگر در Codespace Worker...':'در حال اجرای مرورگر در Actions...'):'آماده';if(v){const bc=$('br-clip');bc.classList.remove('on')}Array.from(document.querySelectorAll('.brBtn,.browserSide .mini')).forEach(b=>b.disabled=v)}
 function setBrowserStatus(s){$('br-status').textContent=s}
 async function browserAct(action,extra={}){
   if(browserLoading)return; if(!cfg.user||!cfg.repo||!cfg.token)return showSetup(); toggleBrowser(true); setBrowserLoading(true);
   try{
     const [provider,model]=$('model').value.split('|'); const id='br_'+uid();
-    const payload=Object.assign({id,type:'browser',browser_session:browserState.sid,action,provider,model},extra||{});
-    const envelope=await encryptObj(payload); await ghPut(`queue/prompt_${id}.json`,envelope,null);
-    setBrowserStatus('در حال روشن کردن Action...');
-    await wakeProxyLoop();
-    setBrowserStatus('منتظر پاسخ Actions...'); const out=await pollResponse(id,{timeoutMs:720000,browser:true});
+    const queueDir=browserBackend==='worker'?'browser_queue':'queue';
+    const payload=Object.assign({id,type:'browser',browser_session:browserState.sid,action,provider,model,backend:browserBackend},extra||{});
+    const envelope=await encryptObj(payload); await ghPut(`${queueDir}/prompt_${id}.json`,envelope,null);
+    if(browserBackend==='worker'){
+      setBrowserStatus('منتظر Codespace Worker...');
+    }else{
+      setBrowserStatus('در حال روشن کردن Action...');
+      await wakeProxyLoop();
+      setBrowserStatus('منتظر پاسخ Actions...');
+    }
+    const out=await pollResponse(id,{timeoutMs:browserBackend==='worker'?360000:720000,browser:true,queueDir,pollMs:browserBackend==='worker'?1400:3500});
     if(out?.browser)renderBrowser(out.browser);
     if(out?.error){const msg=out.error.message||JSON.stringify(out.error);$('br-note').textContent=(out.browser?.note?out.browser.note+'\n':'')+'❌ '+msg;}
   }catch(e){$('br-note').textContent='❌ '+((e&&e.message)||e||'خطای ناشناخته');$('br-clip').classList.remove('on');setBrowserStatus('خطا')}
-  finally{setBrowserLoading(false)}
+  finally{setBrowserLoading(false);updateBrowserBackendUI()}
 }
 function browserOpen(){const url=$('br-url').value.trim(); if(!url)return alert('URL را وارد کن'); browserAct('open',{url})}
 function browserCommand(){const command=$('br-cmd').value.trim(); if(!command)return; browserAct('command',{command})}
@@ -516,6 +527,7 @@ function renderBrowser(b){
   $('br-elems').innerHTML=els.length?els.map(e=>`<div class="elem"><div class="elemTop"><div class="num">${e.index}</div><div class="elemText"><strong>${esc(e.tag||'el')}</strong> · ${esc(e.text||e.href||'بدون متن')} ${e.href?`<br><span class="hint">${esc(e.href)}</span>`:''}</div></div><div class="elemActions"><button class="mini" onclick="browserClickIndex(${e.index})">کلیک</button>${['input','textarea','select'].includes(e.tag)||e.type?`<button class="mini" onclick="browserTypeIndex(${e.index})">تایپ</button>`:''}</div></div>`).join(''):'<div class="hint">عنصر قابل کلیک در viewport فعلی پیدا نشد. اسکرول یا رفرش کن.</div>';
 }
 
+updateBrowserBackendUI();
 init();
 </script>
 </body>
